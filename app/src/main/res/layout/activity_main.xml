@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#F8FAFC">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Bluecore GPS" android:textColor="#0F172A" android:textSize="26sp" android:textStyle="bold" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:layout_marginBottom="20dp"
+            android:text="Send this device's location to your server." android:textColor="#475569" android:textSize="15sp" />
+
+        <EditText android:id="@+id/url" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:hint="Full endpoint URL" android:inputType="textUri" android:singleLine="true" />
+        <EditText android:id="@+id/apiKey" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:hint="ERPNext API key" android:inputType="text" android:singleLine="true" />
+        <EditText android:id="@+id/apiSecret" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:hint="ERPNext API secret" android:inputType="textPassword" android:singleLine="true" />
+        <EditText android:id="@+id/deviceId" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:hint="Device ID / POS name" android:inputType="text" android:singleLine="true" />
+        <EditText android:id="@+id/interval" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:hint="Send interval (minutes)" android:inputType="number" android:singleLine="true" />
+
+        <CheckBox android:id="@+id/startOnBoot" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:text="Resume tracking after restart" android:checked="true" />
+        <Button android:id="@+id/start" android:layout_width="match_parent" android:layout_height="52dp"
+            android:layout_marginTop="16dp" android:text="Save &amp; Start Tracking" />
+        <Button android:id="@+id/sendNow" android:layout_width="match_parent" android:layout_height="52dp"
+            android:layout_marginTop="8dp" android:text="Send Location Now" />
+        <Button android:id="@+id/stop" android:layout_width="match_parent" android:layout_height="52dp"
+            android:layout_marginTop="8dp" android:text="Stop Tracking" />
+        <TextView android:id="@+id/status" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:padding="14dp" android:background="#E2E8F0"
+            android:text="Tracking is stopped." android:textColor="#0F172A" android:textIsSelectable="true" />
+    </LinearLayout>
+</ScrollView>

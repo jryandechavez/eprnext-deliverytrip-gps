@@ -1,0 +1,2 @@
+recursive-include gps_tracker *.css *.csv *.html *.ico *.js *.json *.md *.png *.py *.svg *.txt
+recursive-exclude gps_tracker *.pyc

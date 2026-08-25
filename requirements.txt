@@ -1,0 +1,1 @@
+# Frappe is provided by the Bench environment.
