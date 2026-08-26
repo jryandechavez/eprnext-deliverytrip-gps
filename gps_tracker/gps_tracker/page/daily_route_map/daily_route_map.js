@@ -126,6 +126,7 @@ class BluecoreDailyRoute {
         const latlngs = this.points.map((point) => [Number(point.latitude), Number(point.longitude)]);
         const route = L.polyline(latlngs, { color: "#2563eb", opacity: 0.9, weight: 5 }).addTo(this.map);
         this.map.fitBounds(route.getBounds().pad(0.12), { maxZoom: 17 });
+        this.add_direction_arrows();
 
         this.add_endpoint(this.points[0], "start", "S", __("Route started"));
         if (this.points.length > 1) this.add_endpoint(this.points.at(-1), "end", "E", __("Route ended"));
@@ -189,6 +190,27 @@ class BluecoreDailyRoute {
             .bindPopup(this.popup(__("Stopped for {0}", [this.format_duration(stop.minutes)]), stop.point));
     }
 
+    add_direction_arrows() {
+        if (this.points.length < 2) return;
+        const segment_count = this.points.length - 1;
+        const step = Math.max(1, Math.ceil(segment_count / 80));
+        for (let index = 0; index < segment_count; index += step) {
+            const from = this.points[index];
+            const to = this.points[Math.min(index + step, this.points.length - 1)];
+            if (this.distance_between(from, to) < 0.01) continue;
+            const latitude = (Number(from.latitude) + Number(to.latitude)) / 2;
+            const longitude = (Number(from.longitude) + Number(to.longitude)) / 2;
+            const rotation = this.bearing_between(from, to) - 90;
+            const icon = L.divIcon({
+                className: "",
+                html: `<div class="bluecore-route-arrow" style="transform:rotate(${rotation}deg)">➤</div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+            });
+            L.marker([latitude, longitude], { icon, interactive: false }).addTo(this.map);
+        }
+    }
+
     popup(title, point) {
         const time = frappe.datetime.str_to_user(point.recorded_at);
         const accuracy = point.accuracy == null ? "—" : `${Math.round(point.accuracy)} m`;
@@ -228,6 +250,15 @@ class BluecoreDailyRoute {
             Math.sin(delta_lat / 2) ** 2 +
             Math.cos(lat1) * Math.cos(lat2) * Math.sin(delta_lon / 2) ** 2;
         return radius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+    }
+
+    bearing_between(a, b) {
+        const lat1 = this.radians(Number(a.latitude));
+        const lat2 = this.radians(Number(b.latitude));
+        const delta_lon = this.radians(Number(b.longitude) - Number(a.longitude));
+        const y = Math.sin(delta_lon) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(delta_lon);
+        return (Math.atan2(y, x) * 180) / Math.PI;
     }
 
     minutes_between(a, b) {

@@ -67,3 +67,13 @@
 .bluecore-route-start { background: #16a34a; }
 .bluecore-route-end { background: #dc2626; }
 .bluecore-route-stop { background: #f59e0b; }
+
+.bluecore-route-arrow {
+    color: #0f4fc4;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 22px;
+    text-align: center;
+    text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
+    transform-origin: center;
+}

@@ -34,6 +34,9 @@ Daily per-device delivery routes are available at:
 https://dev.tickandterry.com/app/daily-route-map
 ```
 
+The map includes directional arrows between chronological GPS points, start/end markers,
+detected stops, distance, duration, and point-level timestamps and speed.
+
 The receiver requires valid ERPNext token authentication and does not allow guest submissions.
 
 ## Android app
