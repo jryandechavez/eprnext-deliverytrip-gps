@@ -28,6 +28,19 @@ def _request_data():
     return data
 
 
+def _recorded_at(value):
+    """Return a naive datetime in the ERPNext site's configured timezone."""
+    if not value:
+        return frappe.utils.now_datetime()
+    try:
+        timestamp = frappe.utils.get_datetime(value)
+    except (TypeError, ValueError):
+        frappe.throw(_("Recorded At is not a valid date and time"))
+    if timestamp.tzinfo is not None:
+        timestamp = frappe.utils.convert_utc_to_system_timezone(timestamp).replace(tzinfo=None)
+    return timestamp
+
+
 @frappe.whitelist()
 def location(**kwargs):
     """Store one authenticated location report from a Bluecore GPS device."""
@@ -47,11 +60,7 @@ def location(**kwargs):
     if not -180 <= longitude <= 180:
         frappe.throw(_("Longitude must be between -180 and 180"))
 
-    recorded_at = data.get("recorded_at") or frappe.utils.now()
-    try:
-        recorded_at = frappe.utils.get_datetime(recorded_at)
-    except (TypeError, ValueError):
-        frappe.throw(_("Recorded At is not a valid date and time"))
+    recorded_at = _recorded_at(data.get("recorded_at"))
 
     doc = frappe.get_doc(
         {
