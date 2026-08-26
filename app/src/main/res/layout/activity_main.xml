@@ -1,36 +1,258 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:background="#F8FAFC">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:padding="24dp">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Bluecore GPS" android:textColor="#0F172A" android:textSize="26sp" android:textStyle="bold" />
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" android:layout_marginBottom="20dp"
-            android:text="Send this device's location to your server." android:textColor="#475569" android:textSize="15sp" />
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bc_bg"
+    android:fillViewport="true">
 
-        <EditText android:id="@+id/url" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:hint="Full endpoint URL" android:inputType="textUri" android:singleLine="true" />
-        <EditText android:id="@+id/apiKey" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:hint="ERPNext API key" android:inputType="text" android:singleLine="true" />
-        <EditText android:id="@+id/apiSecret" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:hint="ERPNext API secret" android:inputType="textPassword" android:singleLine="true" />
-        <EditText android:id="@+id/deviceId" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:hint="Device ID / POS name" android:inputType="text" android:singleLine="true" />
-        <EditText android:id="@+id/interval" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:hint="Send interval (minutes)" android:inputType="number" android:singleLine="true" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
 
-        <CheckBox android:id="@+id/startOnBoot" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginTop="8dp" android:text="Resume tracking after restart" android:checked="true" />
-        <Button android:id="@+id/start" android:layout_width="match_parent" android:layout_height="52dp"
-            android:layout_marginTop="16dp" android:text="Save &amp; Start Tracking" />
-        <Button android:id="@+id/sendNow" android:layout_width="match_parent" android:layout_height="52dp"
-            android:layout_marginTop="8dp" android:text="Send Location Now" />
-        <Button android:id="@+id/stop" android:layout_width="match_parent" android:layout_height="52dp"
-            android:layout_marginTop="8dp" android:text="Stop Tracking" />
-        <TextView android:id="@+id/status" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="20dp" android:padding="14dp" android:background="#E2E8F0"
-            android:text="Tracking is stopped." android:textColor="#0F172A" android:textIsSelectable="true" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_header"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="24dp"
+            android:paddingTop="24dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="30dp">
+
+            <ImageView
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:contentDescription="BlueCore logo"
+                android:scaleType="fitCenter"
+                android:src="@mipmap/ic_launcher" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.05"
+                    android:text="BLUECORE"
+                    android:textColor="@color/bc_cyan"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Delivery Tracking"
+                    android:textColor="@android:color/white"
+                    android:textSize="25sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="Secure device location services"
+                    android:textColor="#B9C9E4"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="18dp"
+            android:layout_marginTop="20dp"
+            android:layout_marginEnd="18dp"
+            android:background="@drawable/bg_card"
+            android:elevation="2dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.08"
+                android:text="●  LIVE DEVICE STATUS"
+                android:textColor="@color/bc_success"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_status"
+                android:fontFamily="sans-serif-medium"
+                android:lineSpacingExtra="3dp"
+                android:text="Tracking is stopped."
+                android:textColor="@color/bc_text"
+                android:textIsSelectable="true"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="18dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginEnd="18dp"
+            android:background="@drawable/bg_card"
+            android:elevation="1dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="System Configuration"
+                android:textColor="@color/bc_text"
+                android:textSize="18sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:layout_marginBottom="16dp"
+                android:text="ERPNext connection and reporting policy"
+                android:textColor="@color/bc_muted"
+                android:textSize="13sp" />
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SERVER ENDPOINT" android:textColor="@color/bc_muted" android:textSize="11sp" android:letterSpacing="0.05" />
+            <EditText
+                android:id="@+id/url"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_input"
+                android:hint="https://server/api/method/..."
+                android:inputType="textUri"
+                android:singleLine="true"
+                android:textColor="@color/bc_text"
+                android:textColorHint="#94A1B4"
+                android:textSize="14sp" />
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="API KEY" android:textColor="@color/bc_muted" android:textSize="11sp" android:letterSpacing="0.05" />
+            <EditText
+                android:id="@+id/apiKey"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_input"
+                android:hint="Integration API key"
+                android:inputType="textPassword"
+                android:singleLine="true"
+                android:textColor="@color/bc_text"
+                android:textColorHint="#94A1B4"
+                android:textSize="14sp" />
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="API SECRET" android:textColor="@color/bc_muted" android:textSize="11sp" android:letterSpacing="0.05" />
+            <EditText
+                android:id="@+id/apiSecret"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_input"
+                android:hint="Integration API secret"
+                android:inputType="textPassword"
+                android:singleLine="true"
+                android:textColor="@color/bc_text"
+                android:textColorHint="#94A1B4"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="horizontal">
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginEnd="7dp" android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DEVICE ID" android:textColor="@color/bc_muted" android:textSize="11sp" android:letterSpacing="0.05" />
+                    <EditText android:id="@+id/deviceId" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="6dp" android:background="@drawable/bg_input" android:hint="Device identifier" android:inputType="text" android:singleLine="true" android:textColor="@color/bc_text" android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="112dp" android:layout_height="wrap_content" android:layout_marginStart="7dp" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="INTERVAL (MIN)" android:textColor="@color/bc_muted" android:textSize="11sp" android:letterSpacing="0.05" />
+                    <EditText android:id="@+id/interval" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="6dp" android:background="@drawable/bg_input" android:gravity="center" android:hint="5" android:inputType="number" android:singleLine="true" android:textColor="@color/bc_text" android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/startOnBoot"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:buttonTint="@color/bc_blue"
+                android:checked="true"
+                android:text="Resume tracking after device restart"
+                android:textColor="@color/bc_text"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="18dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginEnd="18dp"
+            android:orientation="vertical">
+
+            <Button
+                android:id="@+id/start"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:background="@drawable/bg_button_primary"
+                android:elevation="0dp"
+                android:fontFamily="sans-serif-medium"
+                android:stateListAnimator="@null"
+                android:text="Save &amp; Start Tracking"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/sendNow"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_button_secondary"
+                android:elevation="0dp"
+                android:fontFamily="sans-serif-medium"
+                android:stateListAnimator="@null"
+                android:text="Send Current Location"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/stop"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_button_danger"
+                android:elevation="0dp"
+                android:fontFamily="sans-serif-medium"
+                android:stateListAnimator="@null"
+                android:text="Stop Tracking"
+                android:textAllCaps="false"
+                android:textColor="@color/bc_danger"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:layout_marginBottom="28dp"
+            android:gravity="center"
+            android:letterSpacing="0.04"
+            android:text="BLUECORE SOLUTIONS CORP.  •  DELIVERY INTELLIGENCE"
+            android:textColor="@color/bc_muted"
+            android:textSize="10sp" />
     </LinearLayout>
 </ScrollView>

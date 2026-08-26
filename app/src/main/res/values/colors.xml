@@ -1,0 +1,14 @@
+<resources>
+    <color name="bc_navy">#07152F</color>
+    <color name="bc_navy_2">#102A56</color>
+    <color name="bc_blue">#247CFF</color>
+    <color name="bc_cyan">#60D9E8</color>
+    <color name="bc_bg">#F3F6FA</color>
+    <color name="bc_card">#FFFFFF</color>
+    <color name="bc_text">#10203A</color>
+    <color name="bc_muted">#66758C</color>
+    <color name="bc_border">#DCE4EF</color>
+    <color name="bc_success_bg">#EAF8F2</color>
+    <color name="bc_success">#16845B</color>
+    <color name="bc_danger">#C33E49</color>
+</resources>
