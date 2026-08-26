@@ -5,24 +5,29 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.*;
 
 public class MainActivity extends Activity implements SharedPreferences.OnSharedPreferenceChangeListener {
     private EditText url, key, secret, deviceId, interval;
     private CheckBox startOnBoot;
-    private TextView status;
+    private TextView status, setupStatus;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); setContentView(R.layout.activity_main);
         url=findViewById(R.id.url); key=findViewById(R.id.apiKey); secret=findViewById(R.id.apiSecret);
         deviceId=findViewById(R.id.deviceId); interval=findViewById(R.id.interval);
-        startOnBoot=findViewById(R.id.startOnBoot); status=findViewById(R.id.status);
+        startOnBoot=findViewById(R.id.startOnBoot); status=findViewById(R.id.status); setupStatus=findViewById(R.id.setupStatus);
         load();
         findViewById(R.id.start).setOnClickListener(v -> start(false));
         findViewById(R.id.sendNow).setOnClickListener(v -> start(true));
         findViewById(R.id.stop).setOnClickListener(v -> stop());
+        findViewById(R.id.completeSetup).setOnClickListener(v -> completeSetup());
     }
 
     private void load() {
@@ -59,9 +64,41 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private void stop() { Config.prefs(this).edit().putBoolean("enabled",false).apply(); Config.status(this,"Tracking is stopped."); stopService(new Intent(this,LocationService.class)); refreshStatus(); }
     private void refreshStatus() { status.setText(Config.enabled(this) ? Config.status(this) : "Tracking is stopped."); }
-    @Override protected void onResume() { super.onResume(); Config.prefs(this).registerOnSharedPreferenceChangeListener(this); refreshStatus(); }
+    @Override protected void onResume() { super.onResume(); Config.prefs(this).registerOnSharedPreferenceChangeListener(this); refreshStatus(); refreshSetup(); }
     @Override protected void onPause() { Config.prefs(this).unregisterOnSharedPreferenceChangeListener(this); super.onPause(); }
     @Override public void onSharedPreferenceChanged(SharedPreferences prefs,String keyName) { if("last_status".equals(keyName) || "enabled".equals(keyName)) runOnUiThread(this::refreshStatus); }
     private void toast(String s) { Toast.makeText(this,s,Toast.LENGTH_LONG).show(); }
-    @Override public void onRequestPermissionsResult(int r,String[] p,int[] g) { super.onRequestPermissionsResult(r,p,g); if(r==10 && g.length>0 && g[0]==PackageManager.PERMISSION_GRANTED) start(false); }
+    private boolean granted(String permission) { return checkSelfPermission(permission)==PackageManager.PERMISSION_GRANTED; }
+    private boolean gpsEnabled() { LocationManager manager=(LocationManager)getSystemService(LOCATION_SERVICE); return manager!=null && manager.isProviderEnabled(LocationManager.GPS_PROVIDER); }
+    private boolean batteryUnrestricted() { PowerManager manager=(PowerManager)getSystemService(POWER_SERVICE); return manager!=null && manager.isIgnoringBatteryOptimizations(getPackageName()); }
+    private boolean backgroundGranted() { return Build.VERSION.SDK_INT<29 || granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION); }
+    private boolean notificationsGranted() { return Build.VERSION.SDK_INT<33 || granted(Manifest.permission.POST_NOTIFICATIONS); }
+    private void refreshSetup() {
+        boolean precise=granted(Manifest.permission.ACCESS_FINE_LOCATION), background=backgroundGranted(), notifications=notificationsGranted(), gps=gpsEnabled(), battery=batteryUnrestricted();
+        setupStatus.setText((precise?"✓":"•")+" Precise location\n"+(background?"✓":"•")+" Background location (Allow all the time)\n"+(notifications?"✓":"•")+" Tracking notification\n"+(gps?"✓":"•")+" GPS enabled\n"+(battery?"✓":"•")+" Battery optimization disabled\n• OEM Autostart: verify in App settings");
+        Button button=findViewById(R.id.completeSetup);
+        button.setText(precise&&background&&notifications&&gps&&battery ? "Review Autostart Settings" : "Complete Required Setup");
+    }
+    private void completeSetup() {
+        if(!granted(Manifest.permission.ACCESS_FINE_LOCATION)) { requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},20); return; }
+        if(!notificationsGranted()) { requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},21); return; }
+        if(!backgroundGranted()) {
+            if(Build.VERSION.SDK_INT==29) requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},22);
+            else openAppSettings();
+            toast("Choose Permissions → Location → Allow all the time"); return;
+        }
+        if(!gpsEnabled()) { startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)); return; }
+        if(!batteryUnrestricted()) {
+            try { startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:"+getPackageName()))); }
+            catch(Exception e) { openAppSettings(); }
+            return;
+        }
+        openAppSettings(); toast("Verify Autostart is enabled and Battery is set to No restrictions");
+    }
+    private void openAppSettings() { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName()))); }
+    @Override public void onRequestPermissionsResult(int r,String[] p,int[] g) {
+        super.onRequestPermissionsResult(r,p,g); refreshSetup();
+        if(r==10 && g.length>0 && g[0]==PackageManager.PERMISSION_GRANTED) start(false);
+        else if((r==20||r==21||r==22) && g.length>0 && g[0]==PackageManager.PERMISSION_GRANTED) completeSetup();
+    }
 }
