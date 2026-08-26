@@ -45,13 +45,15 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
 
     private void start(boolean now) {
+        boolean wasEnabled=Config.enabled(this);
         if (!save()) return;
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.POST_NOTIFICATIONS}, 10); return;
         }
         Config.prefs(this).edit().putBoolean("enabled",true).apply();
         Intent i=new Intent(this,LocationService.class).setAction(now ? LocationService.ACTION_NOW : LocationService.ACTION_START);
-        Config.status(this,"Waiting for a GPS fix…");
+        if(now) Config.status(this,"Requesting current location…");
+        else if(!wasEnabled) Config.status(this,"Waiting for a GPS fix…");
         if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(i); else startService(i);
         refreshStatus();
     }
