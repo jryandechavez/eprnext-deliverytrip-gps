@@ -1,0 +1,24 @@
+{
+ "content": null,
+ "creation": "2026-08-26 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Page",
+ "icon": "map",
+ "idx": 0,
+ "modified": "2026-08-26 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "GPS Tracker",
+ "name": "daily-route-map",
+ "owner": "Administrator",
+ "page_name": "daily-route-map",
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Daily Route Map"
+}

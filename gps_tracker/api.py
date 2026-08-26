@@ -1,4 +1,5 @@
 import math
+from datetime import timedelta
 
 import frappe
 from frappe import _
@@ -39,6 +40,61 @@ def _recorded_at(value):
     if timestamp.tzinfo is not None:
         timestamp = frappe.utils.convert_utc_to_system_timezone(timestamp).replace(tzinfo=None)
     return timestamp
+
+
+def _require_location_read_permission():
+    if not frappe.has_permission("GPS Location", ptype="read"):
+        frappe.throw(_("You do not have permission to view GPS locations"), frappe.PermissionError)
+
+
+@frappe.whitelist()
+def route_devices():
+    """Return device identifiers visible to GPS Location readers."""
+    _require_location_read_permission()
+    rows = frappe.get_all(
+        "GPS Location",
+        fields=["device_id"],
+        group_by="device_id",
+        order_by="device_id asc",
+        limit_page_length=0,
+    )
+    return [row.device_id for row in rows if row.device_id]
+
+
+@frappe.whitelist()
+def daily_route(device_id, date):
+    """Return one device's ordered location history for a site-local day."""
+    _require_location_read_permission()
+    device_id = str(device_id or "").strip()
+    if not device_id:
+        frappe.throw(_("Device ID is required"))
+    try:
+        start = frappe.utils.get_datetime(frappe.utils.getdate(date))
+    except (TypeError, ValueError):
+        frappe.throw(_("A valid date is required"))
+    end = start + timedelta(days=1)
+
+    return frappe.get_all(
+        "GPS Location",
+        filters=[
+            ["device_id", "=", device_id],
+            ["recorded_at", ">=", start],
+            ["recorded_at", "<", end],
+        ],
+        fields=[
+            "name",
+            "device_id",
+            "latitude",
+            "longitude",
+            "accuracy",
+            "altitude",
+            "speed",
+            "bearing",
+            "recorded_at",
+        ],
+        order_by="recorded_at asc",
+        limit_page_length=10000,
+    )
 
 
 @frappe.whitelist()

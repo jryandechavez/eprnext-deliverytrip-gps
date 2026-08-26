@@ -1,0 +1,69 @@
+.bluecore-route-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.bluecore-route-stat {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 14px 16px;
+}
+
+.bluecore-route-stat-label {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.bluecore-route-stat-value {
+    font-size: var(--text-lg);
+    font-weight: 600;
+}
+
+.bluecore-route-map {
+    background: var(--subtle-fg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    height: min(68vh, 720px);
+    min-height: 440px;
+    overflow: hidden;
+}
+
+.bluecore-route-empty {
+    align-items: center;
+    color: var(--text-muted);
+    display: flex;
+    height: 100%;
+    justify-content: center;
+    text-align: center;
+}
+
+.bluecore-route-legend {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-top: 10px;
+}
+
+.bluecore-route-start,
+.bluecore-route-end,
+.bluecore-route-stop {
+    align-items: center;
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+    color: white;
+    display: flex;
+    font-size: 11px;
+    font-weight: 700;
+    height: 28px;
+    justify-content: center;
+    width: 28px;
+}
+
+.bluecore-route-start { background: #16a34a; }
+.bluecore-route-end { background: #dc2626; }
+.bluecore-route-stop { background: #f59e0b; }

@@ -28,6 +28,12 @@ The saved records are available at:
 https://dev.tickandterry.com/app/gps-location
 ```
 
+Daily per-device delivery routes are available at:
+
+```text
+https://dev.tickandterry.com/app/daily-route-map
+```
+
 The receiver requires valid ERPNext token authentication and does not allow guest submissions.
 
 ## Android app
