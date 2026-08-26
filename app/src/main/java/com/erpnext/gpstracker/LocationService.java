@@ -57,7 +57,7 @@ public class LocationService extends Service implements LocationListener {
         Notification.Builder b=Build.VERSION.SDK_INT>=26 ? new Notification.Builder(this,CHANNEL) : new Notification.Builder(this);
         return b.setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentTitle("Bluecore GPS").setContentText(s).setStyle(new Notification.BigTextStyle().bigText(s)).setContentIntent(p).setOngoing(true).build();
     }
-    private void update(String s){((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(NOTIFY,note(s));}
+    private void update(String s){Config.status(this,s);((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(NOTIFY,note(s));}
     @Override public void onDestroy(){if(manager!=null)manager.removeUpdates(this);super.onDestroy();}
     @Override public IBinder onBind(Intent i){return null;}
     @Override public void onStatusChanged(String p,int s,Bundle b){} @Override public void onProviderEnabled(String p){} @Override public void onProviderDisabled(String p){update("Location provider is disabled");}

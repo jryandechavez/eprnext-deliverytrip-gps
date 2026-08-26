@@ -9,7 +9,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.widget.*;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements SharedPreferences.OnSharedPreferenceChangeListener {
     private EditText url, key, secret, deviceId, interval;
     private CheckBox startOnBoot;
     private TextView status;
@@ -30,7 +30,7 @@ public class MainActivity extends Activity {
         url.setText(Config.url(this)); key.setText(Config.key(this)); secret.setText(Config.secret(this));
         deviceId.setText(p.getString("device_id", Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID)));
         interval.setText(String.valueOf(p.getInt("interval",5))); startOnBoot.setChecked(p.getBoolean("boot",true));
-        status.setText(Config.enabled(this) ? "Tracking is enabled. See the persistent notification for the latest result." : "Tracking is stopped.");
+        refreshStatus();
     }
 
     private boolean save() {
@@ -51,10 +51,15 @@ public class MainActivity extends Activity {
         }
         Config.prefs(this).edit().putBoolean("enabled",true).apply();
         Intent i=new Intent(this,LocationService.class).setAction(now ? LocationService.ACTION_NOW : LocationService.ACTION_START);
+        Config.status(this,"Waiting for a GPS fix…");
         if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(i); else startService(i);
-        status.setText("Tracking started. Waiting for a GPS fix…");
+        refreshStatus();
     }
-    private void stop() { Config.prefs(this).edit().putBoolean("enabled",false).apply(); stopService(new Intent(this,LocationService.class)); status.setText("Tracking is stopped."); }
+    private void stop() { Config.prefs(this).edit().putBoolean("enabled",false).apply(); Config.status(this,"Tracking is stopped."); stopService(new Intent(this,LocationService.class)); refreshStatus(); }
+    private void refreshStatus() { status.setText(Config.enabled(this) ? Config.status(this) : "Tracking is stopped."); }
+    @Override protected void onResume() { super.onResume(); Config.prefs(this).registerOnSharedPreferenceChangeListener(this); refreshStatus(); }
+    @Override protected void onPause() { Config.prefs(this).unregisterOnSharedPreferenceChangeListener(this); super.onPause(); }
+    @Override public void onSharedPreferenceChanged(SharedPreferences prefs,String keyName) { if("last_status".equals(keyName) || "enabled".equals(keyName)) runOnUiThread(this::refreshStatus); }
     private void toast(String s) { Toast.makeText(this,s,Toast.LENGTH_LONG).show(); }
     @Override public void onRequestPermissionsResult(int r,String[] p,int[] g) { super.onRequestPermissionsResult(r,p,g); if(r==10 && g.length>0 && g[0]==PackageManager.PERMISSION_GRANTED) start(false); }
 }
