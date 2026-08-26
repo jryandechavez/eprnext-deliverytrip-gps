@@ -109,6 +109,19 @@ def location(**kwargs):
     if len(device_id) > 140:
         frappe.throw(_("Device ID is too long"))
 
+    report_id = str(data.get("report_id") or "").strip()
+    if len(report_id) > 140:
+        frappe.throw(_("Report ID is too long"))
+    if report_id:
+        existing = frappe.db.get_value(
+            "GPS Location",
+            {"report_id": report_id},
+            ["name", "device_id", "latitude", "longitude", "recorded_at"],
+            as_dict=True,
+        )
+        if existing:
+            return existing
+
     latitude = _number(data.get("latitude"), _("Latitude"), required=True)
     longitude = _number(data.get("longitude"), _("Longitude"), required=True)
     if not -90 <= latitude <= 90:
@@ -121,6 +134,7 @@ def location(**kwargs):
     doc = frappe.get_doc(
         {
             "doctype": "GPS Location",
+            "report_id": report_id or None,
             "device_id": device_id,
             "latitude": latitude,
             "longitude": longitude,

@@ -6,6 +6,7 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "report_id",
   "device_id",
   "recorded_at",
   "location_section",
@@ -18,6 +19,14 @@
   "bearing"
  ],
  "fields": [
+  {
+   "fieldname": "report_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Report ID",
+   "no_copy": 1,
+   "unique": 1
+  },
   {
    "fieldname": "device_id",
    "fieldtype": "Data",

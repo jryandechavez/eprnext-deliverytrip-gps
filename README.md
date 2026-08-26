@@ -40,6 +40,11 @@ The receiver requires valid ERPNext token authentication and does not allow gues
 
 The Android app periodically sends the PoC device location to the configured ERPNext endpoint.
 
+Every GPS report is written to a durable local SQLite queue before transmission. When the
+device is offline, reports remain on the device with their original timestamps. Bluecore GPS
+retries automatically every minute and uploads oldest-first when connectivity returns. ERPNext
+uses the report ID to make retries idempotent and avoid duplicate route points.
+
 ## Payload
 
 The app sends `POST` JSON with `device_id`, `latitude`, `longitude`, `accuracy`, `altitude`, `speed`, `bearing`, and `recorded_at`. When an API key is set, it uses ERPNext token authentication:
