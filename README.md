@@ -45,7 +45,8 @@ The Android app periodically sends the PoC device location to the configured ERP
 
 Every GPS report is written to a durable local SQLite queue before transmission. When the
 device is offline, reports remain on the device with their original timestamps. Bluecore GPS
-retries automatically every minute and uploads oldest-first when connectivity returns. ERPNext
+uses Android WorkManager to wake automatically as soon as connectivity returns, plus a periodic
+safety check, and uploads oldest-first without requiring the user to open the app. ERPNext
 uses the report ID to make retries idempotent and avoid duplicate route points.
 
 ## Payload

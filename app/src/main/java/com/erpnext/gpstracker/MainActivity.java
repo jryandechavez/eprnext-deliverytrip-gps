@@ -23,6 +23,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         url=findViewById(R.id.url); key=findViewById(R.id.apiKey); secret=findViewById(R.id.apiSecret);
         deviceId=findViewById(R.id.deviceId); interval=findViewById(R.id.interval);
         startOnBoot=findViewById(R.id.startOnBoot); status=findViewById(R.id.status); setupStatus=findViewById(R.id.setupStatus);
+        UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this);
         load();
         findViewById(R.id.start).setOnClickListener(v -> start(false));
         findViewById(R.id.sendNow).setOnClickListener(v -> start(true));

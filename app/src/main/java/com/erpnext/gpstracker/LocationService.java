@@ -17,7 +17,7 @@ public class LocationService extends Service implements LocationListener {
     private final Handler retryHandler=new Handler(Looper.getMainLooper());
     private final Runnable retryTask=new Runnable(){@Override public void run(){drainQueue();retryHandler.postDelayed(this,60_000L);}};
 
-    @Override public void onCreate() { super.onCreate(); createChannel(); startForeground(NOTIFY,note("Waiting for location…")); manager=(LocationManager)getSystemService(LOCATION_SERVICE); queue=new LocationQueue(this); retryHandler.post(retryTask); }
+    @Override public void onCreate() { super.onCreate(); createChannel(); startForeground(NOTIFY,note("Waiting for location…")); manager=(LocationManager)getSystemService(LOCATION_SERVICE); queue=new LocationQueue(this); UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this); retryHandler.post(retryTask); }
     @Override public int onStartCommand(Intent intent,int flags,int id) {
         if (!Config.enabled(this)) { stopSelf(); return START_NOT_STICKY; }
         try {
@@ -38,6 +38,7 @@ public class LocationService extends Service implements LocationListener {
         lastRecorded=System.currentTimeMillis();
         String payload="{\"report_id\":"+q(UUID.randomUUID().toString())+",\"device_id\":"+q(Config.deviceId(this))+",\"latitude\":"+l.getLatitude()+",\"longitude\":"+l.getLongitude()+",\"accuracy\":"+l.getAccuracy()+",\"altitude\":"+(l.hasAltitude()?l.getAltitude():"null")+",\"speed\":"+(l.hasSpeed()?l.getSpeed():"null")+",\"bearing\":"+(l.hasBearing()?l.getBearing():"null")+",\"recorded_at\":"+q(iso(l.getTime()))+"}";
         queue.enqueue(payload,l.getTime());
+        UploadScheduler.whenOnline(this);
         update("Location saved locally. "+queue.count()+" queued for upload.\n"+coords(l));
         drainQueue();
     }
