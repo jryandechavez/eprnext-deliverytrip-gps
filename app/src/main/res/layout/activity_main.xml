@@ -291,11 +291,21 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
-            android:layout_marginBottom="28dp"
             android:gravity="center"
             android:letterSpacing="0.04"
             android:text="BLUECORE SOLUTIONS CORP.  •  DELIVERY INTELLIGENCE"
             android:textColor="@color/bc_muted"
             android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/versionInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="28dp"
+            android:gravity="center"
+            android:text="App Version"
+            android:textColor="#8996A8"
+            android:textSize="11sp" />
     </LinearLayout>
 </ScrollView>

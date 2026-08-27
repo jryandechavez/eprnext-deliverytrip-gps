@@ -23,6 +23,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         url=findViewById(R.id.url); key=findViewById(R.id.apiKey); secret=findViewById(R.id.apiSecret);
         deviceId=findViewById(R.id.deviceId); interval=findViewById(R.id.interval);
         startOnBoot=findViewById(R.id.startOnBoot); status=findViewById(R.id.status); setupStatus=findViewById(R.id.setupStatus);
+        showVersion();
         UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this);
         load();
         findViewById(R.id.start).setOnClickListener(v -> start(false));
@@ -97,6 +98,13 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         openAppSettings(); toast("Verify Autostart is enabled and Battery is set to No restrictions");
     }
     private void openAppSettings() { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName()))); }
+    private void showVersion() {
+        try {
+            android.content.pm.PackageInfo info=getPackageManager().getPackageInfo(getPackageName(),0);
+            long build=Build.VERSION.SDK_INT>=28?info.getLongVersionCode():info.versionCode;
+            ((TextView)findViewById(R.id.versionInfo)).setText("Bluecore GPS  v"+info.versionName+"  •  Build "+build);
+        } catch(Exception e) { ((TextView)findViewById(R.id.versionInfo)).setText("Bluecore GPS"); }
+    }
     @Override public void onRequestPermissionsResult(int r,String[] p,int[] g) {
         super.onRequestPermissionsResult(r,p,g); refreshSetup();
         if(r==10 && g.length>0 && g[0]==PackageManager.PERMISSION_GRANTED) start(false);
