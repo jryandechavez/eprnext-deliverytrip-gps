@@ -14,6 +14,8 @@ class DeliveryTripRoute {
         this.trip = this.page.add_field({fieldname:"delivery_trip",label:__("Delivery Trip"),fieldtype:"Link",options:"Delivery Trip",reqd:1,change:()=>this.load()});
         this.page.set_primary_action(__("Refresh"),()=>this.load(),"refresh");
         this.page.add_inner_button(__("Populate Coordinates"),()=>this.populate_coordinates(),__("Route Tools"));
+        this.page.add_inner_button(__("Planned Route History"),()=>this.open_history("GPS Route Plan"),__("Route History"));
+        this.page.add_inner_button(__("Actual GPS History"),()=>this.open_history("GPS Location"),__("Route History"));
         this.page.add_inner_button(__("Create / Copy Public Link"),()=>this.create_public_link(),__("Share Route"));
         this.page.add_inner_button(__("Email Public Link"),()=>this.email_public_link(),__("Share Route"));
         this.page.add_inner_button(__("Revoke Public Link"),()=>this.revoke_public_link(),__("Share Route"));
@@ -72,6 +74,7 @@ class DeliveryTripRoute {
     async create_public_link(){const name=this.trip.get_value();if(!name){frappe.msgprint(__("Select a Delivery Trip first."));return;}const r=await frappe.call("gps_tracker.api.issue_public_trip_route_link",{delivery_trip:name}),value=r.message;frappe.msgprint({title:__("24-Hour Public Route Link"),message:`<p>${__("Expires at")}: ${frappe.datetime.str_to_user(value.expires_at)}</p><input class="form-control" readonly value="${frappe.utils.escape_html(value.url)}" onclick="this.select()"><p class="text-muted mt-2">${__("Select the link and copy it to share.")}</p>`,indicator:"green"});}
     email_public_link(){const name=this.trip.get_value();if(!name){frappe.msgprint(__("Select a Delivery Trip first."));return;}const dialog=new frappe.ui.Dialog({title:__("Email 24-Hour Public Route"),fields:[{fieldname:"recipients",label:__("Recipient Emails"),fieldtype:"Data",description:__("Separate multiple addresses with commas."),reqd:1}],primary_action_label:__("Send Email"),primary_action:async values=>{await frappe.call({method:"gps_tracker.api.email_public_trip_route_link",args:{delivery_trip:name,recipients:values.recipients},freeze:true,freeze_message:__("Sending route link…")});dialog.hide();frappe.show_alert({message:__("Public route link emailed successfully"),indicator:"green"});}});dialog.show();}
     async revoke_public_link(){const name=this.trip.get_value();if(!name)return;await frappe.call("gps_tracker.api.revoke_public_trip_route_link",{delivery_trip:name});frappe.show_alert({message:__("Public route link revoked"),indicator:"green"});}
+    open_history(doctype){const name=this.trip.get_value();if(!name){frappe.msgprint(__("Select a Delivery Trip first."));return;}frappe.route_options={delivery_trip:name};frappe.set_route("List",doctype);}
     marker(p,label,klass,title){return L.marker([p.latitude,p.longitude],{icon:L.divIcon({className:"",html:`<div class="bc-marker ${klass}">${label}</div>`,iconSize:[28,28],iconAnchor:[14,14]})}).addTo(this.map).bindPopup(title);}
     cards(items){return items.map(([k,v])=>`<div class="bc-trip-card"><small>${k}</small><strong>${frappe.utils.escape_html(String(v))}</strong></div>`).join("");}
 }
