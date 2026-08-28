@@ -341,6 +341,25 @@ def revoke_public_trip_route_link(delivery_trip):
     frappe.db.commit()
 
 
+@frappe.whitelist()
+def email_public_trip_route_link(delivery_trip, recipients):
+    _trip_permission(delivery_trip, "write")
+    recipients = [item.strip() for item in str(recipients or "").replace(";", ",").split(",") if item.strip()]
+    if not recipients:
+        frappe.throw(_("At least one recipient email is required"))
+    for email in recipients:
+        if not frappe.utils.validate_email_address(email):
+            frappe.throw(_("Invalid email address: {0}").format(email))
+    result = issue_public_trip_route_link(delivery_trip)
+    frappe.sendmail(
+        recipients=recipients,
+        subject=_("Live Delivery Route for {0}").format(delivery_trip),
+        message=_("A live delivery route has been shared with you.<br><br><a href='{0}'>View Live Delivery Route</a><br><br>This secure link expires at {1} and does not display customer names, addresses, or Delivery Note numbers.").format(result["url"], result["expires_at"]),
+        now=True,
+    )
+    return {"recipients": recipients, **result}
+
+
 @frappe.whitelist(allow_guest=True)
 def public_trip_route_status(token):
     token = str(token or "").strip()
