@@ -1,4 +1,12 @@
-frappe.pages["delivery-trip-route"].on_page_load = wrapper => new DeliveryTripRoute(wrapper);
+frappe.pages["delivery-trip-route"].on_page_load = wrapper => {
+    wrapper.bluecore_route = new DeliveryTripRoute(wrapper);
+};
+
+frappe.pages["delivery-trip-route"].on_page_show = wrapper => {
+    const view = wrapper.bluecore_route;
+    const trip = frappe.utils.get_url_arg("delivery_trip") || frappe.route_options?.delivery_trip;
+    if (view?.assets_ready && trip && view.trip.get_value() !== trip) view.trip.set_value(trip);
+};
 
 class DeliveryTripRoute {
     constructor(wrapper) {
@@ -7,11 +15,18 @@ class DeliveryTripRoute {
         this.page.set_primary_action(__("Refresh"),()=>this.load(),"refresh");
         this.$root=$(this.page.body).append(`<div class="bc-trip-summary"></div><div class="bc-trip-layout"><div class="bc-trip-map"></div><div class="bc-trip-stops"></div></div>`);
         this.$map=this.$root.find(".bc-trip-map"); this.$stops=this.$root.find(".bc-trip-stops");
-        frappe.require(["/assets/frappe/js/lib/leaflet/leaflet.css","/assets/frappe/js/lib/leaflet/leaflet.js"]);
-        const initial=frappe.utils.get_url_arg("delivery_trip"); if(initial){this.trip.set_value(initial);}
+        frappe.require(["/assets/frappe/js/lib/leaflet/leaflet.css","/assets/frappe/js/lib/leaflet/leaflet.js"], () => {
+            this.assets_ready = true;
+            const initial = frappe.utils.get_url_arg("delivery_trip") || frappe.route_options?.delivery_trip;
+            if (initial) {
+                if (this.trip.get_value() !== initial) this.trip.set_value(initial);
+                else this.load();
+            }
+            frappe.route_options = null;
+        });
     }
     async load() {
-        const name=this.trip.get_value(); if(!name||typeof L==="undefined") return;
+        const name=this.trip.get_value(); if(!name||!this.assets_ready||typeof L==="undefined") return;
         try { const r=await frappe.call({method:"gps_tracker.api.delivery_trip_route",args:{delivery_trip:name},freeze:true,freeze_message:__("Loading trip route…")}); this.data=r.message; await this.render(); }
         catch(e){this.$map.html(`<div class="p-5 text-muted">${__("Unable to load this Delivery Trip.")}</div>`);}
     }
