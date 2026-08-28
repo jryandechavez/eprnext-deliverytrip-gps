@@ -25,6 +25,9 @@ final class Config {
     static String deliveryTrip(Context c) { return prefs(c).getString("delivery_trip", ""); }
     static String driverId(Context c) { return prefs(c).getString("driver_id", ""); }
     static String routePhase(Context c) { return prefs(c).getString("route_phase", "Delivery"); }
+    static boolean tripStarted(Context c) { return prefs(c).getBoolean("trip_started", false); }
+    static double warehouseLat(Context c) { return Double.longBitsToDouble(prefs(c).getLong("warehouse_lat",Double.doubleToLongBits(Double.NaN))); }
+    static double warehouseLng(Context c) { return Double.longBitsToDouble(prefs(c).getLong("warehouse_lng",Double.doubleToLongBits(Double.NaN))); }
     static String status(Context c) { return prefs(c).getString("last_status", "Waiting for a GPS fix…"); }
     static void status(Context c, String value) {
         prefs(c).edit().putString("last_status", value).putLong("last_status_time", System.currentTimeMillis()).apply();

@@ -125,7 +125,8 @@ def available_delivery_trips(device_id=None, driver=None, search=None):
     if search:
         token = str(search).replace("BLUECORE-TRIP:", "").strip()
         or_filters = {"name": ["like", f"%{token}%"], "driver_name": ["like", f"%{token}%"]}
-    return frappe.get_list(
+    getter = frappe.get_all if driver else frappe.get_list
+    return getter(
         "Delivery Trip", filters=filters, or_filters=or_filters,
         fields=["name", "company", "driver", "driver_name", "vehicle", "departure_time", "status", "gps_device_id", "gps_tracking_status"],
         order_by="departure_time desc", limit_page_length=50,
@@ -134,9 +135,10 @@ def available_delivery_trips(device_id=None, driver=None, search=None):
 
 @frappe.whitelist()
 def delivery_trip_route(delivery_trip, driver=None, device_id=None):
-    _trip_permission(delivery_trip)
-    trip = frappe.get_doc("Delivery Trip", delivery_trip)
     driver = _mobile_driver(driver)
+    if not driver:
+        _trip_permission(delivery_trip)
+    trip = frappe.get_doc("Delivery Trip", delivery_trip)
     if driver and trip.driver != driver:
         frappe.throw(_("This Delivery Trip is assigned to another driver"), frappe.PermissionError)
     if device_id and trip.get("gps_device_id") and trip.gps_device_id != str(device_id).strip():
@@ -211,8 +213,13 @@ def delivery_event(**kwargs):
     existing = event_id and frappe.db.get_value("GPS Delivery Event", {"event_id": event_id}, "name")
     if existing:
         return frappe.get_doc("GPS Delivery Event", existing).as_dict()
-    _trip_permission(trip_name, "write")
     trip = frappe.get_doc("Delivery Trip", trip_name)
+    linked_driver = _mobile_driver(data.get("driver"))
+    if linked_driver:
+        if trip.driver != linked_driver:
+            frappe.throw(_("This Delivery Trip is assigned to another driver"), frappe.PermissionError)
+    else:
+        _trip_permission(trip_name, "write")
     if trip.get("gps_device_id") and trip.gps_device_id != device_id:
         frappe.throw(_("This Delivery Trip is assigned to another device"))
     if not trip.get("gps_device_id"):
@@ -328,6 +335,13 @@ def location(**kwargs):
     if len(device_id) > 140:
         frappe.throw(_("Device ID is too long"))
 
+    delivery_trip = str(data.get("delivery_trip") or "").strip()
+    linked_driver = _mobile_driver()
+    if delivery_trip and linked_driver:
+        assigned_driver = frappe.db.get_value("Delivery Trip", delivery_trip, "driver")
+        if assigned_driver != linked_driver:
+            frappe.throw(_("This Delivery Trip is assigned to another driver"), frappe.PermissionError)
+
     report_id = str(data.get("report_id") or "").strip()
     if len(report_id) > 140:
         frappe.throw(_("Report ID is too long"))
@@ -355,7 +369,7 @@ def location(**kwargs):
             "doctype": "GPS Location",
             "report_id": report_id or None,
             "device_id": device_id,
-            "delivery_trip": str(data.get("delivery_trip") or "").strip() or None,
+            "delivery_trip": delivery_trip or None,
             "route_phase": str(data.get("route_phase") or "").strip() or None,
             "latitude": latitude,
             "longitude": longitude,

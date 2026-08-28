@@ -42,21 +42,30 @@
                 <Button android:id="@+id/searchTrip" android:layout_width="0dp" android:layout_height="50dp" android:layout_marginStart="5dp" android:layout_weight="1" android:background="@drawable/bg_button_secondary" android:text="My Trips" android:textAllCaps="false" android:textColor="@android:color/white" />
             </LinearLayout>
             <Spinner android:id="@+id/routePhase" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="10dp" android:background="@drawable/bg_input" android:entries="@array/route_phases" />
-            <Button android:id="@+id/openTripMap" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginTop="10dp" android:background="@drawable/bg_button_secondary" android:text="Open Delivery Trip Map" android:textAllCaps="false" android:textColor="@android:color/white" />
+            <Button android:id="@+id/openTripMap" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginTop="10dp" android:background="@drawable/bg_button_secondary" android:text="Open Delivery Trip Map" android:textAllCaps="false" android:textColor="@android:color/white" android:visibility="gone" />
             <Button android:id="@+id/loadTrip" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginTop="10dp" android:background="@drawable/bg_button_secondary" android:text="Load / Refresh Delivery Stops" android:textAllCaps="false" android:textColor="@android:color/white" />
-            <Spinner android:id="@+id/deliveryStop" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="10dp" android:background="@drawable/bg_input" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="DELIVERIES" android:textColor="@color/bc_blue" android:textStyle="bold" />
+            <TextView android:id="@+id/deliverySummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Load a trip to view deliveries" android:textColor="@color/bc_muted" />
+            <Button android:id="@+id/showAllDeliveries" android:layout_width="wrap_content" android:layout_height="44dp" android:layout_gravity="end" android:background="@drawable/bg_button_secondary" android:text="Show All" android:textAllCaps="false" android:textColor="@android:color/white" />
+            <LinearLayout android:id="@+id/deliveryList" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
                 <Button android:id="@+id/tripStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Start Trip" android:textAllCaps="false" />
                 <Button android:id="@+id/tripCompleted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="End Deliveries" android:textAllCaps="false" />
             </LinearLayout>
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
-                <Button android:id="@+id/deliveryStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Start Delivery" android:textAllCaps="false" />
-                <Button android:id="@+id/deliveryCompleted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Complete" android:textAllCaps="false" />
+                <Button android:id="@+id/deliveryStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Start Delivery" android:textAllCaps="false" android:visibility="gone" />
+                <Button android:id="@+id/deliveryCompleted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Complete" android:textAllCaps="false" android:visibility="gone" />
             </LinearLayout>
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
                 <Button android:id="@+id/returnStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Start Return" android:textAllCaps="false" />
                 <Button android:id="@+id/returnedWarehouse" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="At Warehouse" android:textAllCaps="false" />
             </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="18dp" android:layout_marginTop="14dp" android:layout_marginEnd="18dp" android:background="@drawable/bg_card" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ROUTE MAP" android:textColor="@color/bc_blue" android:textStyle="bold" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="View assigned stops, actual route, and return journey" android:textColor="@color/bc_muted" />
+            <Button android:id="@+id/openRouteMap" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="12dp" android:background="@drawable/bg_button_primary" android:text="Open Driver Route Map" android:textAllCaps="false" android:textColor="@android:color/white" />
         </LinearLayout>
 
         <LinearLayout

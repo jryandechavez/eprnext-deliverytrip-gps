@@ -26,8 +26,11 @@ import com.google.zxing.integration.android.IntentResult;
 public class MainActivity extends Activity implements SharedPreferences.OnSharedPreferenceChangeListener {
     private EditText url, loginEmail, loginPassword, deviceId, interval, deliveryTrip, driverId;
     private Spinner routePhase;
-    private Spinner deliveryStop;
-    private final ArrayList<String> stopIds=new ArrayList<>();
+    private LinearLayout deliveryList;
+    private TextView deliverySummary;
+    private Button showAllButton;
+    private final ArrayList<JSONObject> deliveryRows=new ArrayList<>();
+    private boolean showAll=false;
     private CheckBox startOnBoot;
     private TextView status, setupStatus, loginStatus;
 
@@ -37,7 +40,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         deviceId=findViewById(R.id.deviceId); interval=findViewById(R.id.interval);
         deliveryTrip=findViewById(R.id.deliveryTrip); routePhase=findViewById(R.id.routePhase);
         driverId=findViewById(R.id.driverId);
-        deliveryStop=findViewById(R.id.deliveryStop);
+        deliveryList=findViewById(R.id.deliveryList); deliverySummary=findViewById(R.id.deliverySummary); showAllButton=findViewById(R.id.showAllDeliveries);
         startOnBoot=findViewById(R.id.startOnBoot); status=findViewById(R.id.status); setupStatus=findViewById(R.id.setupStatus);
         showVersion();
         UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this);
@@ -47,17 +50,17 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         findViewById(R.id.stop).setOnClickListener(v -> stop());
         findViewById(R.id.completeSetup).setOnClickListener(v -> completeSetup());
         findViewById(R.id.openTripMap).setOnClickListener(v -> openTripMap());
+        findViewById(R.id.openRouteMap).setOnClickListener(v -> openTripMap());
         findViewById(R.id.loadTrip).setOnClickListener(v -> loadTrip());
         findViewById(R.id.scanTrip).setOnClickListener(v -> scanTrip());
         findViewById(R.id.searchTrip).setOnClickListener(v -> searchTrips());
+        showAllButton.setOnClickListener(v->{showAll=!showAll;showAllButton.setText(showAll?"Show Ongoing":"Show All");renderDeliveries();});
         findViewById(R.id.signIn).setOnClickListener(v -> signIn());
         findViewById(R.id.signOut).setOnClickListener(v -> signOut());
-        findViewById(R.id.tripStarted).setOnClickListener(v -> queueEvent("Trip Started",false));
-        findViewById(R.id.deliveryStarted).setOnClickListener(v -> queueEvent("Delivery Started",true));
-        findViewById(R.id.deliveryCompleted).setOnClickListener(v -> queueEvent("Delivery Completed",true));
-        findViewById(R.id.tripCompleted).setOnClickListener(v -> queueEvent("Trip Completed",false));
-        findViewById(R.id.returnStarted).setOnClickListener(v -> {routePhase.setSelection(1);save();queueEvent("Return Started",false);});
-        findViewById(R.id.returnedWarehouse).setOnClickListener(v -> queueEvent("Returned to Warehouse",false));
+        findViewById(R.id.tripStarted).setOnClickListener(v -> confirmStart());
+        findViewById(R.id.tripCompleted).setOnClickListener(v -> confirmEnd());
+        findViewById(R.id.returnStarted).setOnClickListener(v -> {routePhase.setSelection(1);save();queueEvent("Return Started","",null);});
+        findViewById(R.id.returnedWarehouse).setOnClickListener(v -> queueEvent("Returned to Warehouse","",null));
     }
 
     private void load() {
@@ -79,7 +82,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         Config.prefs(this).edit().putString("url",endpoint).putString("device_id",deviceId.getText().toString().trim())
             .putInt("interval",mins).putBoolean("boot",startOnBoot.isChecked()).apply();
         String trip=deliveryTrip.getText().toString().trim().replace("BLUECORE-TRIP:","");
-        Config.prefs(this).edit().putString("delivery_trip",trip).putString("route_phase",routePhase.getSelectedItem().toString()).apply();
+        String previous=Config.deliveryTrip(this);SharedPreferences.Editor tripEdit=Config.prefs(this).edit().putString("delivery_trip",trip).putString("route_phase",routePhase.getSelectedItem().toString());if(!trip.equals(previous))tripEdit.putBoolean("trip_started",false);tripEdit.apply();
         Config.prefs(this).edit().putString("driver_id",driverId.getText().toString().trim()).apply();
         return true;
     }
@@ -116,17 +119,20 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private void loadTrip(){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Enter or scan a Delivery Trip first");return;}
-        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<String> labels=new ArrayList<>(),ids=new ArrayList<>();for(int i=0;i<stops.length();i++){JSONObject s=stops.getJSONObject(i);ids.add(s.getString("name"));labels.add((i+1)+". "+s.optString("customer")+" · "+s.optString("delivery_note"));}runOnUiThread(()->{stopIds.clear();stopIds.addAll(ids);deliveryStop.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels));toast(labels.size()+" delivery stops loaded");});}catch(Exception e){runOnUiThread(()->toast("Unable to load trip: "+e.getMessage()));}}).start();
+        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<JSONObject> rows=new ArrayList<>();for(int i=0;i<stops.length();i++)rows.add(stops.getJSONObject(i));JSONObject warehouse=root.optJSONObject("warehouse");runOnUiThread(()->{deliveryRows.clear();deliveryRows.addAll(rows);if(warehouse!=null&&!warehouse.isNull("latitude")&&!warehouse.isNull("longitude"))Config.prefs(this).edit().putLong("warehouse_lat",Double.doubleToRawLongBits(warehouse.optDouble("latitude"))).putLong("warehouse_lng",Double.doubleToRawLongBits(warehouse.optDouble("longitude"))).apply();renderDeliveries();toast(rows.size()+" deliveries loaded");});}catch(Exception e){runOnUiThread(()->toast("Unable to load trip: "+e.getMessage()));}}).start();
     }
-    private void queueEvent(String type,boolean needsStop){
+    private void renderDeliveries(){deliveryList.removeAllViews();int ongoing=0,completed=0;for(JSONObject row:deliveryRows){String state=row.optString("delivery_status","Pending");boolean done="Completed".equals(state)||"Skipped".equals(state);if(done)completed++;else ongoing++;if(!showAll&&done)continue;TextView card=new TextView(this);card.setText(row.optString("customer")+"\n"+row.optString("customer_address")+"\n"+row.optString("delivery_note")+"  •  "+state);card.setTextColor(getColor(R.color.bc_text));card.setTextSize(15);card.setPadding(18,16,18,16);card.setBackgroundResource(R.drawable.bg_status);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,0,0,10);card.setLayoutParams(lp);if(!done)card.setOnClickListener(v->confirmDelivery(row));deliveryList.addView(card);}deliverySummary.setText(ongoing+" ongoing · "+completed+" completed");}
+    private void confirmDelivery(JSONObject row){new AlertDialog.Builder(this).setTitle("Complete Delivery?").setMessage(row.optString("customer")+"\n"+row.optString("customer_address")+"\nDelivery Note: "+row.optString("delivery_note")+"\n\nConfirm the items were delivered successfully.").setNegativeButton("Cancel",null).setPositiveButton("Confirm Delivery",(d,w)->queueEvent("Delivery Completed",row.optString("name"),row)).show();}
+    private void confirmStart(){new AlertDialog.Builder(this).setTitle("Start Deliveries?").setMessage("Begin "+Config.deliveryTrip(this)+" with "+deliveryRows.size()+" delivery stops?").setNegativeButton("Cancel",null).setPositiveButton("Start",(d,w)->{Config.prefs(this).edit().putBoolean("trip_started",true).apply();start(false);queueEvent("Trip Started","",null);}).show();}
+    private void confirmEnd(){new AlertDialog.Builder(this).setTitle("End Deliveries?").setMessage("End the delivery portion of this trip? GPS tracking will continue for the return to warehouse.").setNegativeButton("Cancel",null).setPositiveButton("End Deliveries",(d,w)->{queueEvent("Trip Completed","",null);Config.prefs(this).edit().putString("route_phase","Return").apply();routePhase.setSelection(1);}).show();}
+    private void queueEvent(String type,String stop,JSONObject row){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Select a Delivery Trip first");return;}
-        if(needsStop&&(deliveryStop.getSelectedItemPosition()<0||stopIds.isEmpty())){toast("Load and select a delivery stop first");return;}
         if(!granted(Manifest.permission.ACCESS_FINE_LOCATION)){toast("Precise location permission is required");return;}
         LocationManager lm=(LocationManager)getSystemService(LOCATION_SERVICE);Location a=lm.getLastKnownLocation(LocationManager.GPS_PROVIDER),b=lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);Location l=a==null?b:(b==null||a.getTime()>b.getTime()?a:b);if(l==null){toast("Waiting for a GPS fix");return;}
-        String stop=needsStop?stopIds.get(deliveryStop.getSelectedItemPosition()):"";
         String at=new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ",Locale.US).format(new Date());
-        String payload="{\"event_id\":\""+UUID.randomUUID()+"\",\"delivery_trip\":"+json(Config.deliveryTrip(this))+",\"delivery_stop\":"+json(stop)+",\"device_id\":"+json(Config.deviceId(this))+",\"event_type\":"+json(type)+",\"latitude\":"+l.getLatitude()+",\"longitude\":"+l.getLongitude()+",\"accuracy\":"+l.getAccuracy()+",\"recorded_at\":"+json(at)+"}";
+        String payload="{\"event_id\":\""+UUID.randomUUID()+"\",\"delivery_trip\":"+json(Config.deliveryTrip(this))+",\"delivery_stop\":"+json(stop)+",\"driver\":"+json(Config.driverId(this))+",\"device_id\":"+json(Config.deviceId(this))+",\"event_type\":"+json(type)+",\"latitude\":"+l.getLatitude()+",\"longitude\":"+l.getLongitude()+",\"accuracy\":"+l.getAccuracy()+",\"recorded_at\":"+json(at)+"}";
         new LocationQueue(this).enqueue(payload,System.currentTimeMillis(),"gps_tracker.api.delivery_event");
+        if(row!=null){try{row.put("delivery_status","Completed");}catch(Exception ignored){}renderDeliveries();}
         Intent i=new Intent(this,LocationService.class).setAction(LocationService.ACTION_NOW);if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);toast(type+" saved; it will upload automatically");
     }
     private static String json(String s){return JSONObject.quote(s==null?"":s);}

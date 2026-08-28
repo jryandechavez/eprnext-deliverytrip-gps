@@ -13,7 +13,7 @@ import java.util.*;
 public class LocationService extends Service implements LocationListener {
     static final String ACTION_START="start", ACTION_NOW="now";
     private static final String CHANNEL="gps_tracking"; private static final int NOTIFY=71;
-    private LocationManager manager; private LocationQueue queue; private long lastRecorded=0; private boolean sending=false;
+    private LocationManager manager; private LocationQueue queue; private long lastRecorded=0; private boolean sending=false; private int outsideWarehouseReadings=0;
     private final Handler retryHandler=new Handler(Looper.getMainLooper());
     private final Runnable retryTask=new Runnable(){@Override public void run(){drainQueue();retryHandler.postDelayed(this,60_000L);}};
 
@@ -35,12 +35,20 @@ public class LocationService extends Service implements LocationListener {
     }
     @Override public void onLocationChanged(Location l) { if(System.currentTimeMillis()-lastRecorded>=Config.intervalMs(this)) record(l); }
     private synchronized void record(Location l) {
+        checkMissedStart(l);
         lastRecorded=System.currentTimeMillis();
         String payload="{\"report_id\":"+q(UUID.randomUUID().toString())+",\"device_id\":"+q(Config.deviceId(this))+",\"delivery_trip\":"+q(Config.deliveryTrip(this))+",\"route_phase\":"+q(Config.routePhase(this))+",\"latitude\":"+l.getLatitude()+",\"longitude\":"+l.getLongitude()+",\"accuracy\":"+l.getAccuracy()+",\"altitude\":"+(l.hasAltitude()?l.getAltitude():"null")+",\"speed\":"+(l.hasSpeed()?l.getSpeed():"null")+",\"bearing\":"+(l.hasBearing()?l.getBearing():"null")+",\"recorded_at\":"+q(iso(l.getTime()))+"}";
         queue.enqueue(payload,l.getTime());
         UploadScheduler.whenOnline(this);
         update("Location saved locally. "+queue.count()+" queued for upload.\n"+coords(l));
         drainQueue();
+    }
+    private void checkMissedStart(Location location){
+        if(Config.tripStarted(this)||Config.deliveryTrip(this).isEmpty()||location.getAccuracy()>50)return;
+        double lat=Config.warehouseLat(this),lng=Config.warehouseLng(this);if(Double.isNaN(lat)||Double.isNaN(lng))return;
+        float[] result=new float[1];Location.distanceBetween(lat,lng,location.getLatitude(),location.getLongitude(),result);
+        outsideWarehouseReadings=result[0]>=200?outsideWarehouseReadings+1:0;
+        if(outsideWarehouseReadings==3)update("Action required: vehicle is over 200 m from the warehouse. Open Bluecore GPS and start deliveries.");
     }
     private synchronized void drainQueue() {
         if(sending||queue==null)return;
