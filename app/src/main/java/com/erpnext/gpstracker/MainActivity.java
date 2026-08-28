@@ -33,6 +33,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     private Button showAllButton;
     private WebView routeMapPreview;
     private final ArrayList<JSONObject> deliveryRows=new ArrayList<>();
+    private JSONObject cachedTripData;
     private boolean showAll=false;
     private CheckBox startOnBoot;
     private TextView status, setupStatus, loginStatus;
@@ -49,6 +50,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         showVersion();
         UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this);
         load();
+        restoreCachedTrip();
         findViewById(R.id.completeSetup).setOnClickListener(v -> completeSetup());
         findViewById(R.id.openTripMap).setOnClickListener(v -> openTripMap());
         findViewById(R.id.refreshRouteMap).setOnClickListener(v -> loadTrip());
@@ -121,9 +123,23 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private void loadTrip(){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Enter or scan a Delivery Trip first");return;}
-        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<JSONObject> rows=new ArrayList<>();for(int i=0;i<stops.length();i++)rows.add(stops.getJSONObject(i));JSONObject warehouse=root.optJSONObject("warehouse");runOnUiThread(()->{deliveryRows.clear();deliveryRows.addAll(rows);if(warehouse!=null&&!warehouse.isNull("latitude")&&!warehouse.isNull("longitude"))Config.prefs(this).edit().putLong("warehouse_lat",Double.doubleToRawLongBits(warehouse.optDouble("latitude"))).putLong("warehouse_lng",Double.doubleToRawLongBits(warehouse.optDouble("longitude"))).apply();renderDeliveries();renderInlineMap(root);toast(rows.size()+" deliveries loaded");});}catch(Exception e){runOnUiThread(()->toast("Unable to load trip: "+e.getMessage()));}}).start();
+        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<JSONObject> rows=new ArrayList<>();for(int i=0;i<stops.length();i++)rows.add(stops.getJSONObject(i));JSONObject warehouse=root.optJSONObject("warehouse");runOnUiThread(()->{deliveryRows.clear();deliveryRows.addAll(rows);if(warehouse!=null&&!warehouse.isNull("latitude")&&!warehouse.isNull("longitude"))Config.prefs(this).edit().putLong("warehouse_lat",Double.doubleToRawLongBits(warehouse.optDouble("latitude"))).putLong("warehouse_lng",Double.doubleToRawLongBits(warehouse.optDouble("longitude"))).apply();cacheTrip(root);renderDeliveries();renderInlineMap(root);toast(rows.size()+" deliveries loaded and available offline");});}catch(Exception e){runOnUiThread(()->{if(deliveryRows.isEmpty())restoreCachedTrip();toast(deliveryRows.isEmpty()?"Unable to load trip: "+e.getMessage():"Offline: showing saved trip information");});}}).start();
+    }
+    private void cacheTrip(JSONObject root){
+        cachedTripData=root;
+        Config.prefs(this).edit().putString("cached_trip_name",Config.deliveryTrip(this)).putString("cached_trip_json",root.toString()).apply();
+    }
+    private void cacheCurrentDeliveries(){
+        if(cachedTripData==null)return;
+        try{JSONArray stops=new JSONArray();for(JSONObject row:deliveryRows)stops.put(row);cachedTripData.put("stops",stops);cacheTrip(cachedTripData);}catch(Exception ignored){}
+    }
+    private void restoreCachedTrip(){
+        SharedPreferences p=Config.prefs(this);String active=Config.deliveryTrip(this),saved=p.getString("cached_trip_name","");
+        if(active.isEmpty()||!active.equals(saved))return;
+        try{JSONObject root=new JSONObject(p.getString("cached_trip_json",""));JSONArray stops=root.getJSONArray("stops");deliveryRows.clear();for(int i=0;i<stops.length();i++)deliveryRows.add(stops.getJSONObject(i));cachedTripData=root;renderDeliveries();renderInlineMap(root);deliverySummary.setText(deliverySummary.getText()+" · available offline");}catch(Exception ignored){}
     }
     private void renderInlineMap(JSONObject data){
+        try { data=new JSONObject(data.toString()); } catch(Exception ignored) {}
         try {
             JSONArray source=data.optJSONArray("stops"), filtered=new JSONArray();
             if(source!=null)for(int i=0;i<source.length();i++){JSONObject p=source.getJSONObject(i);if(Math.abs(p.optDouble("latitude"))>.0001||Math.abs(p.optDouble("longitude"))>.0001)filtered.put(p);}
@@ -140,13 +156,15 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     private void confirmEnd(){new AlertDialog.Builder(this).setTitle("End Deliveries?").setMessage("End the delivery portion of this trip? GPS tracking will continue for the return to warehouse.").setNegativeButton("Cancel",null).setPositiveButton("End Deliveries",(d,w)->{queueEvent("Trip Completed","",null);Config.prefs(this).edit().putString("route_phase","Return").apply();routePhase.setSelection(1);}).show();}
     private void queueEvent(String type,String stop,JSONObject row){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Select a Delivery Trip first");return;}
-        if(!granted(Manifest.permission.ACCESS_FINE_LOCATION)){toast("Precise location permission is required");return;}
-        LocationManager lm=(LocationManager)getSystemService(LOCATION_SERVICE);Location a=lm.getLastKnownLocation(LocationManager.GPS_PROVIDER),b=lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);Location l=a==null?b:(b==null||a.getTime()>b.getTime()?a:b);if(l==null){toast("Waiting for a GPS fix");return;}
+        Location l=null;
+        if(granted(Manifest.permission.ACCESS_FINE_LOCATION)){LocationManager lm=(LocationManager)getSystemService(LOCATION_SERVICE);Location a=lm.getLastKnownLocation(LocationManager.GPS_PROVIDER),b=lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);l=a==null?b:(b==null||a.getTime()>b.getTime()?a:b);}
         String at=new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ",Locale.US).format(new Date());
-        String payload="{\"event_id\":\""+UUID.randomUUID()+"\",\"delivery_trip\":"+json(Config.deliveryTrip(this))+",\"delivery_stop\":"+json(stop)+",\"driver\":"+json(Config.driverId(this))+",\"device_id\":"+json(Config.deviceId(this))+",\"event_type\":"+json(type)+",\"latitude\":"+l.getLatitude()+",\"longitude\":"+l.getLongitude()+",\"accuracy\":"+l.getAccuracy()+",\"recorded_at\":"+json(at)+"}";
+        String location=l==null?"\"latitude\":null,\"longitude\":null,\"accuracy\":null":"\"latitude\":"+l.getLatitude()+",\"longitude\":"+l.getLongitude()+",\"accuracy\":"+l.getAccuracy();
+        String payload="{\"event_id\":\""+UUID.randomUUID()+"\",\"delivery_trip\":"+json(Config.deliveryTrip(this))+",\"delivery_stop\":"+json(stop)+",\"driver\":"+json(Config.driverId(this))+",\"device_id\":"+json(Config.deviceId(this))+",\"event_type\":"+json(type)+","+location+",\"recorded_at\":"+json(at)+"}";
         new LocationQueue(this).enqueue(payload,System.currentTimeMillis(),"gps_tracker.api.delivery_event");
-        if(row!=null){try{row.put("delivery_status","Completed");}catch(Exception ignored){}renderDeliveries();}
-        Intent i=new Intent(this,LocationService.class).setAction(LocationService.ACTION_NOW);if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);toast(type+" saved; it will upload automatically");
+        if(row!=null){try{row.put("delivery_status","Completed");row.put("delivery_completed_at",at);}catch(Exception ignored){}cacheCurrentDeliveries();renderDeliveries();}
+        UploadScheduler.whenOnline(this);
+        if(Config.enabled(this)){Intent i=new Intent(this,LocationService.class).setAction(LocationService.ACTION_NOW);if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);}toast(type+" saved offline; it will sync automatically");
     }
     private static String json(String s){return JSONObject.quote(s==null?"":s);}
     private static String read(InputStream in)throws IOException{BufferedReader r=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8));StringBuilder b=new StringBuilder();String s;while((s=r.readLine())!=null)b.append(s);return b.toString();}

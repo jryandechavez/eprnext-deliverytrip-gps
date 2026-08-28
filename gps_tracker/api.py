@@ -274,8 +274,10 @@ def delivery_event(**kwargs):
         frappe.throw(_("This Delivery Trip is assigned to another device"))
     if not trip.get("gps_device_id"):
         trip.db_set("gps_device_id", device_id, update_modified=False)
-    latitude = _number(data.get("latitude"), _("Latitude"), required=True)
-    longitude = _number(data.get("longitude"), _("Longitude"), required=True)
+    latitude = _number(data.get("latitude"), _("Latitude"))
+    longitude = _number(data.get("longitude"), _("Longitude"))
+    if (latitude is None) != (longitude is None):
+        frappe.throw(_("Latitude and Longitude must be provided together"))
     timestamp = _recorded_at(data.get("recorded_at"))
     stop = None
     stop_name = str(data.get("delivery_stop") or "").strip()
@@ -287,10 +289,13 @@ def delivery_event(**kwargs):
         frappe.db.set_value("Delivery Stop", stop.name, "gps_delivery_status", status, update_modified=False)
         if time_field:
             frappe.db.set_value("Delivery Stop", stop.name, time_field, timestamp, update_modified=False)
-        if event_type == "Delivery Started":
+        if event_type == "Delivery Started" and latitude is not None:
             frappe.db.set_value("Delivery Stop", stop.name, {"gps_start_latitude": latitude, "gps_start_longitude": longitude}, update_modified=False)
         elif event_type == "Delivery Completed":
-            frappe.db.set_value("Delivery Stop", stop.name, {"visited": 1, "gps_completion_latitude": latitude, "gps_completion_longitude": longitude}, update_modified=False)
+            values = {"visited": 1}
+            if latitude is not None:
+                values.update({"gps_completion_latitude": latitude, "gps_completion_longitude": longitude})
+            frappe.db.set_value("Delivery Stop", stop.name, values, update_modified=False)
     if event_type in EVENT_RULES:
         status_field, status, time_field = EVENT_RULES[event_type]
         frappe.db.set_value("Delivery Trip", trip.name, {status_field: status, time_field: timestamp}, update_modified=False)
