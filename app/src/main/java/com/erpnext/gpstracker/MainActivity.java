@@ -127,16 +127,17 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private void cacheTrip(JSONObject root){
         cachedTripData=root;
-        Config.prefs(this).edit().putString("cached_trip_name",Config.deliveryTrip(this)).putString("cached_trip_json",root.toString()).apply();
+        LocationQueue database=new LocationQueue(this);try{database.cacheTrip(Config.deliveryTrip(this),root.toString());}finally{database.close();}
     }
     private void cacheCurrentDeliveries(){
         if(cachedTripData==null)return;
         try{JSONArray stops=new JSONArray();for(JSONObject row:deliveryRows)stops.put(row);cachedTripData.put("stops",stops);cacheTrip(cachedTripData);}catch(Exception ignored){}
     }
     private void restoreCachedTrip(){
-        SharedPreferences p=Config.prefs(this);String active=Config.deliveryTrip(this),saved=p.getString("cached_trip_name","");
-        if(active.isEmpty()||!active.equals(saved))return;
-        try{JSONObject root=new JSONObject(p.getString("cached_trip_json",""));JSONArray stops=root.getJSONArray("stops");deliveryRows.clear();for(int i=0;i<stops.length();i++)deliveryRows.add(stops.getJSONObject(i));cachedTripData=root;renderDeliveries();renderInlineMap(root);deliverySummary.setText(deliverySummary.getText()+" · available offline");}catch(Exception ignored){}
+        String active=Config.deliveryTrip(this);if(active.isEmpty())return;
+        LocationQueue database=new LocationQueue(this);String payload;try{payload=database.cachedTrip(active);}finally{database.close();}
+        if(payload==null)return;
+        try{JSONObject root=new JSONObject(payload);JSONArray stops=root.getJSONArray("stops");deliveryRows.clear();for(int i=0;i<stops.length();i++)deliveryRows.add(stops.getJSONObject(i));cachedTripData=root;renderDeliveries();renderInlineMap(root);deliverySummary.setText(deliverySummary.getText()+" · available offline");}catch(Exception ignored){}
     }
     private void renderInlineMap(JSONObject data){
         try { data=new JSONObject(data.toString()); } catch(Exception ignored) {}
