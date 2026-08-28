@@ -13,6 +13,21 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@drawable/bg_header"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="24dp">
+            <ImageView android:layout_width="72dp" android:layout_height="72dp" android:contentDescription="BlueCore logo" android:scaleType="fitCenter" android:src="@mipmap/ic_launcher" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="18dp" android:layout_weight="1" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="sans-serif-medium" android:letterSpacing="0.05" android:text="BLUECORE" android:textColor="@color/bc_cyan" android:textSize="12sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:fontFamily="sans-serif-medium" android:text="Delivery Tracking" android:textColor="@android:color/white" android:textSize="25sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Secure corporate driver services" android:textColor="#B9C9E4" android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginStart="18dp"
             android:layout_marginTop="14dp"
             android:layout_marginEnd="18dp"
@@ -48,6 +63,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_header"
+            android:visibility="gone"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingStart="24dp"
@@ -214,33 +230,38 @@
                 android:textColorHint="#94A1B4"
                 android:textSize="14sp" />
 
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="API KEY" android:textColor="@color/bc_muted" android:textSize="11sp" android:letterSpacing="0.05" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="DRIVER EMAIL" android:textColor="@color/bc_muted" android:textSize="11sp" android:letterSpacing="0.05" />
             <EditText
-                android:id="@+id/apiKey"
+                android:id="@+id/loginEmail"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="6dp"
                 android:background="@drawable/bg_input"
-                android:hint="Integration API key"
-                android:inputType="textPassword"
+                android:hint="name@company.com"
+                android:inputType="textEmailAddress"
                 android:singleLine="true"
                 android:textColor="@color/bc_text"
                 android:textColorHint="#94A1B4"
                 android:textSize="14sp" />
 
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="API SECRET" android:textColor="@color/bc_muted" android:textSize="11sp" android:letterSpacing="0.05" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="PASSWORD" android:textColor="@color/bc_muted" android:textSize="11sp" android:letterSpacing="0.05" />
             <EditText
-                android:id="@+id/apiSecret"
+                android:id="@+id/loginPassword"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="6dp"
                 android:background="@drawable/bg_input"
-                android:hint="Integration API secret"
+                android:hint="ERPNext password"
                 android:inputType="textPassword"
                 android:singleLine="true"
                 android:textColor="@color/bc_text"
                 android:textColorHint="#94A1B4"
                 android:textSize="14sp" />
+            <TextView android:id="@+id/loginStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="Not signed in" android:textColor="@color/bc_muted" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
+                <Button android:id="@+id/signIn" android:layout_width="0dp" android:layout_height="50dp" android:layout_marginEnd="5dp" android:layout_weight="1" android:background="@drawable/bg_button_primary" android:text="Sign In" android:textAllCaps="false" android:textColor="@android:color/white" />
+                <Button android:id="@+id/signOut" android:layout_width="0dp" android:layout_height="50dp" android:layout_marginStart="5dp" android:layout_weight="1" android:background="@drawable/bg_button_secondary" android:text="Sign Out" android:textAllCaps="false" android:textColor="@android:color/white" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"

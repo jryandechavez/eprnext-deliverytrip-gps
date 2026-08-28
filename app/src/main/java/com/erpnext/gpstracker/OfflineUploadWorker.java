@@ -17,7 +17,7 @@ public class OfflineUploadWorker extends Worker {
             for(int sent=0;sent<100;sent++) {
                 LocationQueue.Item item=queue.oldest();
                 if(item==null) { Config.status(context,"All saved locations uploaded successfully. 0 queued."); return Result.success(); }
-                String error=upload(context,item.payload);
+                String error=upload(context,item);
                 if(error!=null) { queue.failed(item.id,error); Config.status(context,"Automatic upload pending: "+queue.count()+" saved locally.\n"+error); return Result.retry(); }
                 queue.remove(item.id); Config.status(context,"Automatic upload active: "+queue.count()+" queued.");
             }
@@ -25,14 +25,15 @@ public class OfflineUploadWorker extends Worker {
         } finally { queue.close(); }
     }
 
-    private String upload(Context context,String payload) {
+    private String upload(Context context,LocationQueue.Item item) {
         HttpURLConnection connection=null;
         try {
-            connection=(HttpURLConnection)new URL(Config.url(context)).openConnection();
+            String configured=Config.url(context);int marker=configured.indexOf("/api/method/");String base=marker>0?configured.substring(0,marker):configured;
+            connection=(HttpURLConnection)new URL(base+"/api/method/"+item.method).openConnection();
             connection.setConnectTimeout(15000); connection.setReadTimeout(15000); connection.setRequestMethod("POST"); connection.setDoOutput(true);
             connection.setRequestProperty("Content-Type","application/json"); connection.setRequestProperty("Accept","application/json");
-            if(!Config.key(context).isEmpty()) connection.setRequestProperty("Authorization","token "+Config.key(context)+":"+Config.secret(context));
-            try(OutputStream output=connection.getOutputStream()){output.write(payload.getBytes(StandardCharsets.UTF_8));}
+            ErpAuth.apply(context,connection);
+            try(OutputStream output=connection.getOutputStream()){output.write(item.payload.getBytes(StandardCharsets.UTF_8));}
             int code=connection.getResponseCode();
             if(code>=200&&code<300)return null;
             return "Server error HTTP "+code+": "+read(connection.getErrorStream());

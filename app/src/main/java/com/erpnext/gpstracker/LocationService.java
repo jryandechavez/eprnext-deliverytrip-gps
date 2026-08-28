@@ -54,7 +54,7 @@ public class LocationService extends Service implements LocationListener {
                 String configured=Config.url(this); int marker=configured.indexOf("/api/method/"); String base=marker>0?configured.substring(0,marker):configured;
                 c=(HttpURLConnection)new URL(base+"/api/method/"+item.method).openConnection(); c.setConnectTimeout(15000); c.setReadTimeout(15000);
                 c.setRequestMethod("POST"); c.setDoOutput(true); c.setRequestProperty("Content-Type","application/json"); c.setRequestProperty("Accept","application/json");
-                if(!Config.key(this).isEmpty()) c.setRequestProperty("Authorization","token "+Config.key(this)+":"+Config.secret(this));
+                ErpAuth.apply(this,c);
                 try(OutputStream os=c.getOutputStream()){os.write(item.payload.getBytes(StandardCharsets.UTF_8));}
                 int code=c.getResponseCode(); String response=read(code>=400?c.getErrorStream():c.getInputStream());
                 if(code>=200&&code<300) {

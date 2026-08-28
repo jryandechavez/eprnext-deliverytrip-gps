@@ -24,16 +24,16 @@ import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 
 public class MainActivity extends Activity implements SharedPreferences.OnSharedPreferenceChangeListener {
-    private EditText url, key, secret, deviceId, interval, deliveryTrip, driverId;
+    private EditText url, loginEmail, loginPassword, deviceId, interval, deliveryTrip, driverId;
     private Spinner routePhase;
     private Spinner deliveryStop;
     private final ArrayList<String> stopIds=new ArrayList<>();
     private CheckBox startOnBoot;
-    private TextView status, setupStatus;
+    private TextView status, setupStatus, loginStatus;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); setContentView(R.layout.activity_main);
-        url=findViewById(R.id.url); key=findViewById(R.id.apiKey); secret=findViewById(R.id.apiSecret);
+        url=findViewById(R.id.url); loginEmail=findViewById(R.id.loginEmail); loginPassword=findViewById(R.id.loginPassword); loginStatus=findViewById(R.id.loginStatus);
         deviceId=findViewById(R.id.deviceId); interval=findViewById(R.id.interval);
         deliveryTrip=findViewById(R.id.deliveryTrip); routePhase=findViewById(R.id.routePhase);
         driverId=findViewById(R.id.driverId);
@@ -50,6 +50,8 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         findViewById(R.id.loadTrip).setOnClickListener(v -> loadTrip());
         findViewById(R.id.scanTrip).setOnClickListener(v -> scanTrip());
         findViewById(R.id.searchTrip).setOnClickListener(v -> searchTrips());
+        findViewById(R.id.signIn).setOnClickListener(v -> signIn());
+        findViewById(R.id.signOut).setOnClickListener(v -> signOut());
         findViewById(R.id.tripStarted).setOnClickListener(v -> queueEvent("Trip Started",false));
         findViewById(R.id.deliveryStarted).setOnClickListener(v -> queueEvent("Delivery Started",true));
         findViewById(R.id.deliveryCompleted).setOnClickListener(v -> queueEvent("Delivery Completed",true));
@@ -60,7 +62,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
 
     private void load() {
         SharedPreferences p=Config.prefs(this);
-        url.setText(Config.url(this)); key.setText(Config.key(this)); secret.setText(Config.secret(this));
+        url.setText(Config.url(this)); loginEmail.setText(Config.userEmail(this)); updateLoginStatus();
         deviceId.setText(p.getString("device_id", Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID)));
         interval.setText(String.valueOf(p.getInt("interval",5))); startOnBoot.setChecked(p.getBoolean("boot",true));
         deliveryTrip.setText(p.getString("delivery_trip",""));
@@ -74,8 +76,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         if (!(endpoint.startsWith("http://") || endpoint.startsWith("https://"))) { toast("Enter a full http:// or https:// URL"); return false; }
         int mins; try { mins=Integer.parseInt(interval.getText().toString()); } catch(Exception e) { mins=0; }
         if (mins < 1) { toast("Interval must be at least 1 minute"); return false; }
-        Config.prefs(this).edit().putString("url",endpoint).putString("api_key",key.getText().toString().trim())
-            .putString("api_secret",secret.getText().toString()).putString("device_id",deviceId.getText().toString().trim())
+        Config.prefs(this).edit().putString("url",endpoint).putString("device_id",deviceId.getText().toString().trim())
             .putInt("interval",mins).putBoolean("boot",startOnBoot.isChecked()).apply();
         String trip=deliveryTrip.getText().toString().trim().replace("BLUECORE-TRIP:","");
         Config.prefs(this).edit().putString("delivery_trip",trip).putString("route_phase",routePhase.getSelectedItem().toString()).apply();
@@ -91,6 +92,14 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(base+"/app/delivery-trip-route?delivery_trip="+Uri.encode(trip))));
     }
     private String baseUrl(){String e=Config.url(this);int i=e.indexOf("/api/method/");return i>0?e.substring(0,i):e;}
+    private void updateLoginStatus(){String email=Config.userEmail(this);loginStatus.setText(Config.sessionId(this).isEmpty()?"Not signed in":"Signed in as "+email);}
+    private void signIn(){
+        if(!save())return;String email=loginEmail.getText().toString().trim(),password=loginPassword.getText().toString();
+        if(email.isEmpty()||password.isEmpty()){toast("Enter your ERPNext email and password");return;}
+        findViewById(R.id.signIn).setEnabled(false);loginStatus.setText("Signing in securely…");
+        new Thread(()->{HttpURLConnection c=null;try{c=(HttpURLConnection)new URL(baseUrl()+"/api/method/login").openConnection();c.setConnectTimeout(15000);c.setReadTimeout(15000);c.setRequestMethod("POST");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/x-www-form-urlencoded");String form="usr="+URLEncoder.encode(email,"UTF-8")+"&pwd="+URLEncoder.encode(password,"UTF-8");try(OutputStream out=c.getOutputStream()){out.write(form.getBytes(StandardCharsets.UTF_8));}int code=c.getResponseCode();String sid="";Map<String,List<String>> headers=c.getHeaderFields();for(Map.Entry<String,List<String>> h:headers.entrySet())if(h.getKey()!=null&&"Set-Cookie".equalsIgnoreCase(h.getKey()))for(String cookie:h.getValue())if(cookie.startsWith("sid=")){sid=cookie.substring(4,cookie.indexOf(';'));break;}if(code<200||code>=300||sid.isEmpty())throw new IOException("Login failed (HTTP "+code+")");Config.prefs(this).edit().putString("session_id",sid).putString("user_email",email).remove("api_key").remove("api_secret").apply();runOnUiThread(()->{loginPassword.setText("");updateLoginStatus();toast("Signed in successfully");});}catch(Exception e){runOnUiThread(()->{loginPassword.setText("");loginStatus.setText("Sign-in failed");toast("Unable to sign in: check email, password, and server");});}finally{if(c!=null)c.disconnect();runOnUiThread(()->findViewById(R.id.signIn).setEnabled(true));}}).start();
+    }
+    private void signOut(){Config.prefs(this).edit().remove("session_id").remove("user_email").apply();loginPassword.setText("");loginEmail.setText("");updateLoginStatus();toast("Signed out");}
     private void scanTrip(){new IntentIntegrator(this).setPrompt("Scan the Delivery Trip QR code").setBeepEnabled(false).setOrientationLocked(false).initiateScan();}
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
         IntentResult result=IntentIntegrator.parseActivityResult(requestCode,resultCode,data);
@@ -99,7 +108,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private void searchTrips(){
         if(!save())return; String query=deliveryTrip.getText().toString().trim().replace("BLUECORE-TRIP:","");
-        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.available_delivery_trips?device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&search="+URLEncoder.encode(query,"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();c.setRequestProperty("Authorization","token "+Config.key(this)+":"+Config.secret(this));JSONArray rows=new JSONObject(read(c.getInputStream())).getJSONArray("message");ArrayList<String> names=new ArrayList<>(),labels=new ArrayList<>();for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);String name=row.getString("name");names.add(name);labels.add(name+"\n"+row.optString("driver_name")+" · "+row.optString("status"));}runOnUiThread(()->showTripResults(names,labels));}catch(Exception e){runOnUiThread(()->toast("Unable to search trips: "+e.getMessage()));}}).start();
+        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.available_delivery_trips?device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&search="+URLEncoder.encode(query,"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONArray rows=new JSONObject(read(c.getInputStream())).getJSONArray("message");ArrayList<String> names=new ArrayList<>(),labels=new ArrayList<>();for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);String name=row.getString("name");names.add(name);labels.add(name+"\n"+row.optString("driver_name")+" · "+row.optString("status"));}runOnUiThread(()->showTripResults(names,labels));}catch(Exception e){runOnUiThread(()->toast("Unable to search trips: "+e.getMessage()));}}).start();
     }
     private void showTripResults(ArrayList<String> names,ArrayList<String> labels){
         if(names.isEmpty()){toast("No available Delivery Trips found");return;}
@@ -107,7 +116,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private void loadTrip(){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Enter or scan a Delivery Trip first");return;}
-        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();c.setRequestProperty("Authorization","token "+Config.key(this)+":"+Config.secret(this));JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<String> labels=new ArrayList<>(),ids=new ArrayList<>();for(int i=0;i<stops.length();i++){JSONObject s=stops.getJSONObject(i);ids.add(s.getString("name"));labels.add((i+1)+". "+s.optString("customer")+" · "+s.optString("delivery_note"));}runOnUiThread(()->{stopIds.clear();stopIds.addAll(ids);deliveryStop.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels));toast(labels.size()+" delivery stops loaded");});}catch(Exception e){runOnUiThread(()->toast("Unable to load trip: "+e.getMessage()));}}).start();
+        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<String> labels=new ArrayList<>(),ids=new ArrayList<>();for(int i=0;i<stops.length();i++){JSONObject s=stops.getJSONObject(i);ids.add(s.getString("name"));labels.add((i+1)+". "+s.optString("customer")+" · "+s.optString("delivery_note"));}runOnUiThread(()->{stopIds.clear();stopIds.addAll(ids);deliveryStop.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels));toast(labels.size()+" delivery stops loaded");});}catch(Exception e){runOnUiThread(()->toast("Unable to load trip: "+e.getMessage()));}}).start();
     }
     private void queueEvent(String type,boolean needsStop){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Select a Delivery Trip first");return;}
