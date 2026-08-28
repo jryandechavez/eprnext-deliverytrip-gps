@@ -65,7 +65,8 @@
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="18dp" android:layout_marginTop="14dp" android:layout_marginEnd="18dp" android:background="@drawable/bg_card" android:orientation="vertical">
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ROUTE MAP" android:textColor="@color/bc_blue" android:textStyle="bold" />
             <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="View assigned stops, actual route, and return journey" android:textColor="@color/bc_muted" />
-            <Button android:id="@+id/openRouteMap" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="12dp" android:background="@drawable/bg_button_primary" android:text="Open Driver Route Map" android:textAllCaps="false" android:textColor="@android:color/white" />
+            <WebView android:id="@+id/routeMapPreview" android:layout_width="match_parent" android:layout_height="280dp" android:layout_marginTop="12dp" android:background="#E8EEF6" />
+            <Button android:id="@+id/refreshRouteMap" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="10dp" android:background="@drawable/bg_button_secondary" android:text="Refresh Route &amp; Deliveries" android:textAllCaps="false" android:textColor="@android:color/white" />
         </LinearLayout>
 
         <LinearLayout

@@ -14,6 +14,8 @@ import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.*;
+import android.webkit.WebView;
+import android.webkit.WebSettings;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +31,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     private LinearLayout deliveryList;
     private TextView deliverySummary;
     private Button showAllButton;
+    private WebView routeMapPreview;
     private final ArrayList<JSONObject> deliveryRows=new ArrayList<>();
     private boolean showAll=false;
     private CheckBox startOnBoot;
@@ -41,13 +44,14 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         deliveryTrip=findViewById(R.id.deliveryTrip); routePhase=findViewById(R.id.routePhase);
         driverId=findViewById(R.id.driverId);
         deliveryList=findViewById(R.id.deliveryList); deliverySummary=findViewById(R.id.deliverySummary); showAllButton=findViewById(R.id.showAllDeliveries);
+        routeMapPreview=findViewById(R.id.routeMapPreview);routeMapPreview.getSettings().setJavaScriptEnabled(true);routeMapPreview.getSettings().setDomStorageEnabled(true);routeMapPreview.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
         startOnBoot=findViewById(R.id.startOnBoot); status=findViewById(R.id.status); setupStatus=findViewById(R.id.setupStatus);
         showVersion();
         UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this);
         load();
         findViewById(R.id.completeSetup).setOnClickListener(v -> completeSetup());
         findViewById(R.id.openTripMap).setOnClickListener(v -> openTripMap());
-        findViewById(R.id.openRouteMap).setOnClickListener(v -> openTripMap());
+        findViewById(R.id.refreshRouteMap).setOnClickListener(v -> loadTrip());
         findViewById(R.id.loadTrip).setOnClickListener(v -> loadTrip());
         findViewById(R.id.scanTrip).setOnClickListener(v -> scanTrip());
         findViewById(R.id.searchTrip).setOnClickListener(v -> searchTrips());
@@ -117,7 +121,12 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private void loadTrip(){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Enter or scan a Delivery Trip first");return;}
-        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<JSONObject> rows=new ArrayList<>();for(int i=0;i<stops.length();i++)rows.add(stops.getJSONObject(i));JSONObject warehouse=root.optJSONObject("warehouse");runOnUiThread(()->{deliveryRows.clear();deliveryRows.addAll(rows);if(warehouse!=null&&!warehouse.isNull("latitude")&&!warehouse.isNull("longitude"))Config.prefs(this).edit().putLong("warehouse_lat",Double.doubleToRawLongBits(warehouse.optDouble("latitude"))).putLong("warehouse_lng",Double.doubleToRawLongBits(warehouse.optDouble("longitude"))).apply();renderDeliveries();toast(rows.size()+" deliveries loaded");});}catch(Exception e){runOnUiThread(()->toast("Unable to load trip: "+e.getMessage()));}}).start();
+        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<JSONObject> rows=new ArrayList<>();for(int i=0;i<stops.length();i++)rows.add(stops.getJSONObject(i));JSONObject warehouse=root.optJSONObject("warehouse");runOnUiThread(()->{deliveryRows.clear();deliveryRows.addAll(rows);if(warehouse!=null&&!warehouse.isNull("latitude")&&!warehouse.isNull("longitude"))Config.prefs(this).edit().putLong("warehouse_lat",Double.doubleToRawLongBits(warehouse.optDouble("latitude"))).putLong("warehouse_lng",Double.doubleToRawLongBits(warehouse.optDouble("longitude"))).apply();renderDeliveries();renderInlineMap(root);toast(rows.size()+" deliveries loaded");});}catch(Exception e){runOnUiThread(()->toast("Unable to load trip: "+e.getMessage()));}}).start();
+    }
+    private void renderInlineMap(JSONObject data){
+        String payload=data.toString().replace("</","<\\/");
+        String html="<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'><style>html,body,#map{height:100%;margin:0} .leaflet-control-attribution{font-size:8px}.pin{background:#2563eb;color:white;border:2px solid white;border-radius:50%;width:24px;height:24px;line-height:20px;text-align:center;font-weight:bold;box-shadow:0 1px 4px #555}</style></head><body><div id='map'></div><script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script><script>const d="+payload+";const m=L.map('map',{zoomControl:true});L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m);const valid=p=>p&&isFinite(+p.latitude)&&isFinite(+p.longitude);const planned=[d.warehouse,...d.stops].filter(valid),delivery=d.locations.filter(p=>p.route_phase!=='Return'&&valid(p)),ret=d.locations.filter(p=>p.route_phase==='Return'&&valid(p)),all=[];if(valid(d.warehouse)){const p=[+d.warehouse.latitude,+d.warehouse.longitude];all.push(p);L.marker(p).addTo(m).bindPopup('Warehouse')}d.stops.filter(valid).forEach((s,i)=>{const p=[+s.latitude,+s.longitude];all.push(p);L.marker(p,{icon:L.divIcon({className:'',html:'<div class=pin>'+(i+1)+'</div>',iconSize:[24,24],iconAnchor:[12,12]})}).addTo(m).bindPopup((s.customer||'')+'<br>'+(s.delivery_note||''))});if(planned.length>1)L.polyline(planned.map(p=>[p.latitude,p.longitude]),{color:'#2563eb',weight:4,dashArray:'7 7'}).addTo(m);if(delivery.length){const p=delivery.map(x=>[x.latitude,x.longitude]);all.push(...p);L.polyline(p,{color:'#16a34a',weight:5}).addTo(m);L.circleMarker(p[p.length-1],{radius:7,color:'#16a34a',fillOpacity:1}).addTo(m).bindPopup('Current position')}if(ret.length){const p=ret.map(x=>[x.latitude,x.longitude]);all.push(...p);L.polyline(p,{color:'#7c3aed',weight:5}).addTo(m)}if(all.length)m.fitBounds(all,{padding:[22,22],maxZoom:16});else m.setView([14.6,121],6);</script></body></html>";
+        routeMapPreview.loadDataWithBaseURL("https://bluecore.local/",html,"text/html","UTF-8",null);
     }
     private void renderDeliveries(){deliveryList.removeAllViews();int ongoing=0,completed=0;for(JSONObject row:deliveryRows){String state=row.optString("delivery_status","Pending");boolean done="Completed".equals(state)||"Skipped".equals(state);if(done)completed++;else ongoing++;if(!showAll&&done)continue;TextView card=new TextView(this);card.setText(row.optString("customer")+"\n"+row.optString("customer_address")+"\n"+row.optString("delivery_note")+"  •  "+state);card.setTextColor(getColor(R.color.bc_text));card.setTextSize(15);card.setPadding(18,16,18,16);card.setBackgroundResource(R.drawable.bg_status);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,0,0,10);card.setLayoutParams(lp);if(!done)card.setOnClickListener(v->confirmDelivery(row));deliveryList.addView(card);}deliverySummary.setText(ongoing+" ongoing · "+completed+" completed");}
     private void confirmDelivery(JSONObject row){new AlertDialog.Builder(this).setTitle("Complete Delivery?").setMessage(row.optString("customer")+"\n"+row.optString("customer_address")+"\nDelivery Note: "+row.optString("delivery_note")+"\n\nConfirm the items were delivered successfully.").setNegativeButton("Cancel",null).setPositiveButton("Confirm Delivery",(d,w)->queueEvent("Delivery Completed",row.optString("name"),row)).show();}
