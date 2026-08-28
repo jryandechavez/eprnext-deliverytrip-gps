@@ -1,0 +1,24 @@
+{
+ "doctype": "DocType",
+ "name": "GPS Route Plan",
+ "module": "GPS Tracker",
+ "autoname": "format:GRP-{#####}",
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "field_order": ["delivery_trip", "generated_at", "active", "route_hash", "metrics_section", "distance_m", "duration_s", "waypoints_json", "geometry_json"],
+ "fields": [
+  {"fieldname":"delivery_trip","label":"Delivery Trip","fieldtype":"Link","options":"Delivery Trip","reqd":1,"in_list_view":1},
+  {"fieldname":"generated_at","label":"Generated At","fieldtype":"Datetime","reqd":1,"in_list_view":1},
+  {"fieldname":"active","label":"Active Plan","fieldtype":"Check","default":"1","in_list_view":1},
+  {"fieldname":"route_hash","label":"Route Hash","fieldtype":"Data","reqd":1,"hidden":1},
+  {"fieldname":"metrics_section","label":"Route Metrics","fieldtype":"Section Break"},
+  {"fieldname":"distance_m","label":"Distance (m)","fieldtype":"Float"},
+  {"fieldname":"duration_s","label":"Duration (seconds)","fieldtype":"Float"},
+  {"fieldname":"waypoints_json","label":"Ordered Waypoints","fieldtype":"Code","options":"JSON","read_only":1},
+  {"fieldname":"geometry_json","label":"Planned Road Geometry","fieldtype":"Code","options":"JSON","read_only":1}
+ ],
+ "permissions": [
+  {"role":"System Manager","read":1,"write":1,"create":1,"delete":1,"report":1,"export":1},
+  {"role":"Delivery Manager","read":1,"report":1,"export":1}
+ ]
+}

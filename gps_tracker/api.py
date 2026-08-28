@@ -1,4 +1,6 @@
 import math
+import hashlib
+import json
 import secrets
 import time
 import requests
@@ -184,6 +186,40 @@ def delivery_trip_route(delivery_trip, driver=None, device_id=None):
                  "starting_warehouse": trip.get("starting_warehouse")},
         "warehouse": warehouse, "stops": stops, "locations": locations, "events": events,
     }
+
+
+@frappe.whitelist()
+def save_planned_route(delivery_trip, waypoints, geometry=None, distance_m=None, duration_s=None):
+    """Persist a versioned planned route; identical waypoint plans are de-duplicated."""
+    _trip_permission(delivery_trip, "write")
+    if isinstance(waypoints, str):
+        waypoints = json.loads(waypoints)
+    if isinstance(geometry, str):
+        geometry = json.loads(geometry)
+    if not isinstance(waypoints, list) or len(waypoints) < 2 or len(waypoints) > 200:
+        frappe.throw(_("A planned route requires between 2 and 200 waypoints"))
+    normalized = []
+    for point in waypoints:
+        latitude = _number(point.get("latitude"), _("Latitude"), required=True)
+        longitude = _number(point.get("longitude"), _("Longitude"), required=True)
+        normalized.append({"latitude": round(latitude, 7), "longitude": round(longitude, 7),
+                           "delivery_note": str(point.get("delivery_note") or "")})
+    route_hash = hashlib.sha256(json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    existing = frappe.db.get_value("GPS Route Plan", {"delivery_trip": delivery_trip, "route_hash": route_hash}, "name")
+    if existing:
+        return {"name": existing, "created": False}
+    for name in frappe.get_all("GPS Route Plan", filters={"delivery_trip": delivery_trip, "active": 1}, pluck="name"):
+        frappe.db.set_value("GPS Route Plan", name, "active", 0, update_modified=False)
+    doc = frappe.get_doc({
+        "doctype": "GPS Route Plan", "delivery_trip": delivery_trip,
+        "generated_at": frappe.utils.now_datetime(), "route_hash": route_hash, "active": 1,
+        "waypoints_json": json.dumps(normalized, separators=(",", ":")),
+        "geometry_json": json.dumps(geometry or [], separators=(",", ":")),
+        "distance_m": _number(distance_m, _("Distance")) or 0,
+        "duration_s": _number(duration_s, _("Duration")) or 0,
+    }).insert(ignore_permissions=True)
+    frappe.db.commit()
+    return {"name": doc.name, "created": True}
 
 
 def _geocode_text(text):

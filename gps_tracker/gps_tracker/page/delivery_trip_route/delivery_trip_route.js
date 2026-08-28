@@ -45,6 +45,7 @@ class DeliveryTripRoute {
         d.stops.filter(valid).forEach((s,i)=>this.marker(s,String(i+1),"bc-stop-marker",`${s.customer||""}<br>${s.delivery_note||""}`));
         d.events.filter(valid).forEach(e=>this.marker(e,"✓","bc-event-marker",`${e.event_type}<br>${e.delivery_note||""}<br>${frappe.datetime.str_to_user(e.recorded_at)}`));
         const plannedLine=await this.planned_route(planned);
+        if(plannedLine.length>1)frappe.call({method:"gps_tracker.api.save_planned_route",args:{delivery_trip:d.trip.name,waypoints:planned.map(p=>({latitude:p.latitude,longitude:p.longitude,delivery_note:p.delivery_note||""})),geometry:plannedLine}}).catch(()=>{});
         if(plannedLine.length)L.polyline(plannedLine,{color:"#2563eb",weight:5,opacity:.7,dashArray:"8 8"}).addTo(this.map);
         if(delivery.length)L.polyline(delivery.map(p=>[p.latitude,p.longitude]),{color:"#16a34a",weight:5}).addTo(this.map);
         if(returned.length)L.polyline(returned.map(p=>[p.latitude,p.longitude]),{color:"#7c3aed",weight:5}).addTo(this.map);
