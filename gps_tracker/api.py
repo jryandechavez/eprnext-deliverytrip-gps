@@ -354,7 +354,7 @@ def email_public_trip_route_link(delivery_trip, recipients):
     frappe.sendmail(
         recipients=recipients,
         subject=_("Live Delivery Route for {0}").format(delivery_trip),
-        message=_("A live delivery route has been shared with you.<br><br><a href='{0}'>View Live Delivery Route</a><br><br>This secure link expires at {1} and does not display customer names, addresses, or Delivery Note numbers.").format(result["url"], result["expires_at"]),
+        message=_("A live delivery route has been shared with you.<br><br><a href='{0}'>View Live Delivery Route</a><br><br>This secure link expires at {1}.").format(result["url"], result["expires_at"]),
         now=True,
     )
     return {"recipients": recipients, **result}
@@ -376,8 +376,10 @@ def public_trip_route_status(token):
         warehouse = frappe.db.get_value("Warehouse", trip.starting_warehouse, ["warehouse_name", "gps_latitude", "gps_longitude"], as_dict=True)
         if warehouse:
             warehouse.latitude, warehouse.longitude = warehouse.gps_latitude, warehouse.gps_longitude
-    stops = [{"number": row.idx, "delivery_note": row.delivery_note, "latitude": row.lat, "longitude": row.lng,
-              "status": row.get("gps_delivery_status") or "Pending"} for row in trip.delivery_stops]
+    stops = [{"number": row.idx, "delivery_note": row.delivery_note, "customer": row.customer,
+              "address": row.customer_address or row.address, "latitude": row.lat, "longitude": row.lng,
+              "status": row.get("gps_delivery_status") or "Pending",
+              "completed_at": row.get("gps_delivery_completed_at")} for row in trip.delivery_stops]
     locations = frappe.get_all("GPS Location", filters={"delivery_trip": trip.name},
         fields=["latitude", "longitude", "recorded_at", "route_phase"], order_by="recorded_at asc", limit_page_length=20000)
     return {"company": trip.company, "driver": trip.driver_name or trip.driver, "vehicle": trip.vehicle,
