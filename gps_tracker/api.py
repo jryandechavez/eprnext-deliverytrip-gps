@@ -370,7 +370,7 @@ def public_trip_route_status(token):
         frappe.throw(_("This route link is invalid or disabled"), frappe.PermissionError)
     trip = frappe.get_doc("Delivery Trip", trip_name)
     if not trip.gps_public_route_expires_at or frappe.utils.get_datetime(trip.gps_public_route_expires_at) <= frappe.utils.now_datetime():
-        frappe.throw(_("This 24-hour route link has expired"), frappe.PermissionError)
+        return {"ended": True, "message": _("This live delivery has ended."), "expired_at": trip.gps_public_route_expires_at}
     warehouse = None
     if trip.starting_warehouse:
         warehouse = frappe.db.get_value("Warehouse", trip.starting_warehouse, ["warehouse_name", "gps_latitude", "gps_longitude"], as_dict=True)
