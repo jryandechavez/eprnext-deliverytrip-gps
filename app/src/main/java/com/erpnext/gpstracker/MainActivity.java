@@ -51,6 +51,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this);
         load();
         restoreCachedTrip();
+        if(!Config.deliveryTrip(this).isEmpty()&&!Config.sessionId(this).isEmpty())loadTrip();
         findViewById(R.id.completeSetup).setOnClickListener(v -> completeSetup());
         findViewById(R.id.openTripMap).setOnClickListener(v -> openTripMap());
         findViewById(R.id.refreshRouteMap).setOnClickListener(v -> loadTrip());
