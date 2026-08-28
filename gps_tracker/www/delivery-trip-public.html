@@ -17,7 +17,7 @@
   let map=null, timer=null;
 
   function status(s){return s.status==="Completed"?"Completed":"Ongoing"}
-  function details(s){return `<div class="delivery-popup"><h4>${esc(s.delivery_note||"Delivery Note")}</h4><p><b>Status:</b> ${status(s)}</p><p><b>Customer:</b> ${esc(s.customer||"—")}</p><p><b>Delivery address:</b> ${esc(s.address||"—")}</p><p><b>Stop:</b> ${s.number}</p>${s.completed_at?`<p><b>Completed:</b> ${esc(s.completed_at)}</p>`:""}</div>`}
+  function details(s){const window=s.delivery_window_start||s.delivery_window_end?`${s.delivery_window_start||"Start open"} – ${s.delivery_window_end||"End open"}`:"No restricted time slot";return `<div class="delivery-popup"><h4>${esc(s.delivery_note||"Delivery Note")}</h4><p><b>Status:</b> ${status(s)}</p><p><b>Customer:</b> ${esc(s.customer||"—")}</p><p><b>Delivery address:</b> ${esc(s.address||"—")}</p><p><b>Delivery window:</b> ${esc(window)}</p><p><b>Stop:</b> ${s.number}</p>${s.completed_at?`<p><b>Completed:</b> ${esc(s.completed_at)}</p>`:""}</div>`}
   function openDetails(i){
     const s=window.bcPublicStops[i];
     document.getElementById("modal-content").innerHTML=details(s);
@@ -37,13 +37,34 @@
     add(d.warehouse,false);d.stops.forEach(p=>add(p,true));
     return points;
   }
+  function minutes(value){if(!value)return null;const p=String(value).split(":");return (+p[0])*60+(+p[1])}
+  function distance(a,b){const rad=Math.PI/180,dLat=(+b.latitude-+a.latitude)*rad,dLon=(+b.longitude-+a.longitude)*rad,x=Math.sin(dLat/2)**2+Math.cos(+a.latitude*rad)*Math.cos(+b.latitude*rad)*Math.sin(dLon/2)**2;return 12742*Math.asin(Math.sqrt(x))}
+  function prioritize(groups){
+    if(groups.length<3)return groups;
+    const ordered=[groups[0]],remaining=groups.slice(1),now=new Date(),clock=now.getHours()*60+now.getMinutes();
+    while(remaining.length){
+      const current=ordered[ordered.length-1].point;
+      remaining.sort((a,b)=>{
+        const da=distance(current,a.point),db=distance(current,b.point);
+        const ea=Math.min(...a.stops.map(s=>minutes(s.delivery_window_end)).filter(v=>v!==null)),eb=Math.min(...b.stops.map(s=>minutes(s.delivery_window_end)).filter(v=>v!==null));
+        const ua=isFinite(ea)?ea-clock-da*1.5:Infinity,ub=isFinite(eb)?eb-clock-db*1.5:Infinity;
+        if(ua<=45||ub<=45){if(ua!==ub)return ua-ub}
+        const sa=Math.min(...a.stops.map(s=>minutes(s.delivery_window_start)).filter(v=>v!==null)),sb=Math.min(...b.stops.map(s=>minutes(s.delivery_window_start)).filter(v=>v!==null));
+        if(isFinite(sa)&&sa<=clock+60&&!(isFinite(sb)&&sb<=clock+60))return -1;
+        if(isFinite(sb)&&sb<=clock+60&&!(isFinite(sa)&&sa<=clock+60))return 1;
+        return da-db;
+      });
+      ordered.push(remaining.shift());
+    }
+    return ordered;
+  }
   async function roadRoute(groups){
     if(groups.length<2)return [];
     const coords=groups.map(g=>`${+g.point.longitude},${+g.point.latitude}`).join(";");
     try{
-      const url=`https://router.project-osrm.org/trip/v1/driving/${coords}?roundtrip=false&source=first&geometries=geojson&overview=full`;
+      const url=`https://router.project-osrm.org/route/v1/driving/${coords}?geometries=geojson&overview=full&steps=false`;
       const r=await fetch(url),j=await r.json();
-      if(r.ok&&j.code==="Ok"&&j.trips&&j.trips[0])return j.trips[0].geometry.coordinates.map(p=>[p[1],p[0]]);
+      if(r.ok&&j.code==="Ok"&&j.routes&&j.routes[0])return j.routes[0].geometry.coordinates.map(p=>[p[1],p[0]]);
     }catch(e){}
     return groups.map(g=>[+g.point.latitude,+g.point.longitude]);
   }
@@ -58,7 +79,7 @@
       document.getElementById("delivery-notes").innerHTML=d.stops.map((s,i)=>`<button class="note" onclick="bcOpenDelivery(${i})"><span class="number">${s.number}</span><span class="note-name"><small>Delivery Note</small><strong>${esc(s.delivery_note||"—")}</strong><small>${esc(s.customer||"")}</small></span><span class="status ${status(s).toLowerCase()}">${status(s)}</span></button>`).join("");
       if(map)map.remove(); map=L.map("map"); const all=[];
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
-      const groups=uniquePoints(d), planned=await roadRoute(groups);
+      const groups=prioritize(uniquePoints(d)), planned=await roadRoute(groups);
       if(planned.length>1)L.polyline(planned,{color:"#2563eb",weight:4,dashArray:"8 8"}).addTo(map);
       groups.forEach((g,i)=>{const p=[+g.point.latitude,+g.point.longitude];all.push(p);const popup=i===0?"<b>Starting warehouse</b>":g.stops.map(details).join('<hr>');L.marker(p).addTo(map).bindPopup(popup,{maxWidth:320})});
       const delivery=d.locations.filter(p=>p.route_phase!=="Return"&&valid(p)),ret=d.locations.filter(p=>p.route_phase==="Return"&&valid(p));

@@ -23,7 +23,9 @@ CUSTOM_FIELDS = {
     "Delivery Stop": [
         {"fieldname": "gps_delivery_section", "label": "Delivery Tracking", "fieldtype": "Section Break", "insert_after": "details"},
         {"fieldname": "gps_delivery_status", "label": "Delivery Status", "fieldtype": "Select", "options": "Pending\nArrived\nDelivery Started\nCompleted\nFailed\nSkipped", "default": "Pending", "insert_after": "gps_delivery_section"},
-        {"fieldname": "gps_arrived_at", "label": "Arrived At", "fieldtype": "Datetime", "insert_after": "gps_delivery_status"},
+        {"fieldname": "gps_delivery_window_start", "label": "Delivery Window Start", "fieldtype": "Time", "insert_after": "gps_delivery_status", "description": "Earliest time when this customer can receive the delivery."},
+        {"fieldname": "gps_delivery_window_end", "label": "Delivery Window End", "fieldtype": "Time", "insert_after": "gps_delivery_window_start", "description": "Latest time when this customer can receive the delivery."},
+        {"fieldname": "gps_arrived_at", "label": "Arrived At", "fieldtype": "Datetime", "insert_after": "gps_delivery_window_end"},
         {"fieldname": "gps_delivery_started_at", "label": "Delivery Started At", "fieldtype": "Datetime", "insert_after": "gps_arrived_at"},
         {"fieldname": "gps_delivery_completed_at", "label": "Delivery Completed At", "fieldtype": "Datetime", "insert_after": "gps_delivery_started_at"},
         {"fieldname": "gps_event_column", "fieldtype": "Column Break", "insert_after": "gps_delivery_completed_at"},

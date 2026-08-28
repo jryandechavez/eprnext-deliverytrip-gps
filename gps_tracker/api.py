@@ -161,6 +161,8 @@ def delivery_trip_route(delivery_trip, driver=None, device_id=None):
             "address": row.address, "customer_address": row.customer_address,
             "delivery_note": row.delivery_note, "latitude": row.lat, "longitude": row.lng,
             "estimated_arrival": row.estimated_arrival, "visited": row.visited,
+            "delivery_window_start": row.get("gps_delivery_window_start"),
+            "delivery_window_end": row.get("gps_delivery_window_end"),
             "delivery_status": row.get("gps_delivery_status") or "Pending",
             "arrived_at": row.get("gps_arrived_at"), "delivery_started_at": row.get("gps_delivery_started_at"),
             "delivery_completed_at": row.get("gps_delivery_completed_at"),
@@ -376,10 +378,22 @@ def public_trip_route_status(token):
         warehouse = frappe.db.get_value("Warehouse", trip.starting_warehouse, ["warehouse_name", "gps_latitude", "gps_longitude"], as_dict=True)
         if warehouse:
             warehouse.latitude, warehouse.longitude = warehouse.gps_latitude, warehouse.gps_longitude
-    stops = [{"number": row.idx, "delivery_note": row.delivery_note, "customer": row.customer,
-              "address": row.customer_address or row.address, "latitude": row.lat, "longitude": row.lng,
-              "status": row.get("gps_delivery_status") or "Pending",
-              "completed_at": row.get("gps_delivery_completed_at")} for row in trip.delivery_stops]
+    note_names = [row.delivery_note for row in trip.delivery_stops if row.delivery_note]
+    note_details = {row.name: row for row in frappe.get_all(
+        "Delivery Note", filters={"name": ["in", note_names]},
+        fields=["name", "customer", "customer_name", "address_display"], limit_page_length=0,
+    )} if note_names else {}
+    stops = []
+    for row in trip.delivery_stops:
+        note = note_details.get(row.delivery_note, {})
+        stops.append({"number": row.idx, "delivery_note": row.delivery_note,
+                      "customer": row.customer or note.get("customer_name") or note.get("customer"),
+                      "address": row.customer_address or row.address or note.get("address_display"),
+                      "latitude": row.lat, "longitude": row.lng,
+                      "delivery_window_start": row.get("gps_delivery_window_start"),
+                      "delivery_window_end": row.get("gps_delivery_window_end"),
+                      "status": row.get("gps_delivery_status") or "Pending",
+                      "completed_at": row.get("gps_delivery_completed_at")})
     locations = frappe.get_all("GPS Location", filters={"delivery_trip": trip.name},
         fields=["latitude", "longitude", "recorded_at", "route_phase"], order_by="recorded_at asc", limit_page_length=20000)
     return {"company": trip.company, "driver": trip.driver_name or trip.driver, "vehicle": trip.vehicle,

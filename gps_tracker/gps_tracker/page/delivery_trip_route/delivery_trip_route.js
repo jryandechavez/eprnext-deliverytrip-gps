@@ -37,7 +37,7 @@ class DeliveryTripRoute {
     async render() {
         if(this.map)this.map.remove(); this.$map.empty();
         const d=this.data, valid=p=>p&&Number.isFinite(Number(p.latitude))&&Number.isFinite(Number(p.longitude))&&(Math.abs(Number(p.latitude))>0.0001||Math.abs(Number(p.longitude))>0.0001);
-        const planned=[d.warehouse,...d.stops].filter(valid), delivery=d.locations.filter(p=>p.route_phase!=="Return"&&valid(p)), returned=d.locations.filter(p=>p.route_phase==="Return"&&valid(p));
+        const planned=this.prioritize_points([d.warehouse,...d.stops].filter(valid)), delivery=d.locations.filter(p=>p.route_phase!=="Return"&&valid(p)), returned=d.locations.filter(p=>p.route_phase==="Return"&&valid(p));
         const missing=(d.warehouse&&!valid(d.warehouse)?1:0)+d.stops.filter(s=>!valid(s)).length;
         if(missing)frappe.show_alert({message:__("{0} route locations need coordinates. Use Route Tools → Populate Coordinates.",[missing]),indicator:"orange"},8);
         this.map=L.map(this.$map[0]); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap contributors"}).addTo(this.map);
@@ -58,6 +58,14 @@ class DeliveryTripRoute {
         if(points.length<2)return points.map(p=>[p.latitude,p.longitude]);
         const coords=points.map(p=>`${p.longitude},${p.latitude}`).join(";");
         try{const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);const j=await r.json();return j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);}catch(e){frappe.show_alert({message:__("Road routing unavailable; showing straight planned line."),indicator:"orange"});return points.map(p=>[p.latitude,p.longitude]);}
+    }
+    prioritize_points(points){
+        if(points.length<3)return points;
+        const unique=[];
+        points.forEach(p=>{const key=`${Number(p.latitude).toFixed(5)},${Number(p.longitude).toFixed(5)}`,existing=unique.find(x=>x.key===key);if(existing){if(p.delivery_note)existing.stops.push(p)}else unique.push({key,point:p,stops:p.delivery_note?[p]:[]})});
+        const ordered=[unique[0]],remaining=unique.slice(1),now=new Date(),clock=now.getHours()*60+now.getMinutes(),minutes=value=>{if(!value)return null;const p=String(value).split(":");return Number(p[0])*60+Number(p[1])},distance=(a,b)=>{const rad=Math.PI/180,dlat=(Number(b.latitude)-Number(a.latitude))*rad,dlon=(Number(b.longitude)-Number(a.longitude))*rad,x=Math.pow(Math.sin(dlat/2),2)+Math.cos(Number(a.latitude)*rad)*Math.cos(Number(b.latitude)*rad)*Math.pow(Math.sin(dlon/2),2);return 12742*Math.asin(Math.sqrt(x))};
+        while(remaining.length){const current=ordered[ordered.length-1].point;remaining.sort((a,b)=>{const da=distance(current,a.point),db=distance(current,b.point),endsA=a.stops.map(s=>minutes(s.delivery_window_end)).filter(v=>v!==null),endsB=b.stops.map(s=>minutes(s.delivery_window_end)).filter(v=>v!==null),ea=endsA.length?Math.min(...endsA):Infinity,eb=endsB.length?Math.min(...endsB):Infinity,ua=ea-clock-da*1.5,ub=eb-clock-db*1.5;if(ua<=45||ub<=45){if(ua!==ub)return ua-ub}const startsA=a.stops.map(s=>minutes(s.delivery_window_start)).filter(v=>v!==null),startsB=b.stops.map(s=>minutes(s.delivery_window_start)).filter(v=>v!==null),sa=startsA.length?Math.min(...startsA):Infinity,sb=startsB.length?Math.min(...startsB):Infinity;if(sa<=clock+60&&!(sb<=clock+60))return -1;if(sb<=clock+60&&!(sa<=clock+60))return 1;return da-db});ordered.push(remaining.shift())}
+        return ordered.map(x=>x.point);
     }
     async populate_coordinates(){const name=this.trip.get_value();if(!name)return;const r=await frappe.call({method:"gps_tracker.api.populate_delivery_trip_coordinates",args:{delivery_trip:name},freeze:true,freeze_message:__("Populating route coordinates…")});const result=r.message||{};frappe.msgprint({title:__("Coordinate Results"),message:__("Updated: {0}<br>Unresolved: {1}",[(result.updated||[]).length,(result.unresolved||[]).length]),indicator:(result.unresolved||[]).length?"orange":"green"});await this.load();}
     async create_public_link(){const name=this.trip.get_value();if(!name){frappe.msgprint(__("Select a Delivery Trip first."));return;}const r=await frappe.call("gps_tracker.api.issue_public_trip_route_link",{delivery_trip:name}),value=r.message;frappe.msgprint({title:__("24-Hour Public Route Link"),message:`<p>${__("Expires at")}: ${frappe.datetime.str_to_user(value.expires_at)}</p><input class="form-control" readonly value="${frappe.utils.escape_html(value.url)}" onclick="this.select()"><p class="text-muted mt-2">${__("Select the link and copy it to share.")}</p>`,indicator:"green"});}
