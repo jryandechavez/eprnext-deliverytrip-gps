@@ -22,6 +22,15 @@ def set_delivery_trip_start(doc, method=None):
     doc.starting_warehouse_address = _warehouse_address(doc.get("starting_warehouse"))
     route = [doc.get("starting_warehouse") or "Starting Warehouse"]
     for stop in doc.get("delivery_stops") or []:
+        if stop.address and (not stop.get("gps_delivery_window_start") or not stop.get("gps_delivery_window_end")):
+            window = frappe.db.get_value(
+                "Address", stop.address,
+                ["gps_delivery_window_start", "gps_delivery_window_end"], as_dict=True,
+            ) or {}
+            if not stop.get("gps_delivery_window_start"):
+                stop.gps_delivery_window_start = window.get("gps_delivery_window_start")
+            if not stop.get("gps_delivery_window_end"):
+                stop.gps_delivery_window_end = window.get("gps_delivery_window_end")
         label = stop.customer or stop.address or "Delivery Stop"
         if stop.delivery_note:
             label += f" ({stop.delivery_note})"

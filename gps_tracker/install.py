@@ -23,8 +23,8 @@ CUSTOM_FIELDS = {
     "Delivery Stop": [
         {"fieldname": "gps_delivery_section", "label": "Delivery Tracking", "fieldtype": "Section Break", "insert_after": "details"},
         {"fieldname": "gps_delivery_status", "label": "Delivery Status", "fieldtype": "Select", "options": "Pending\nArrived\nDelivery Started\nCompleted\nFailed\nSkipped", "default": "Pending", "insert_after": "gps_delivery_section"},
-        {"fieldname": "gps_delivery_window_start", "label": "Delivery Window Start", "fieldtype": "Time", "insert_after": "gps_delivery_status", "description": "Earliest time when this customer can receive the delivery."},
-        {"fieldname": "gps_delivery_window_end", "label": "Delivery Window End", "fieldtype": "Time", "insert_after": "gps_delivery_window_start", "description": "Latest time when this customer can receive the delivery."},
+        {"fieldname": "gps_delivery_window_start", "label": "Delivery Window Start", "fieldtype": "Time", "insert_after": "gps_delivery_status", "fetch_from": "address.gps_delivery_window_start", "fetch_if_empty": 1, "description": "Fetched from the Customer Address; may be adjusted for this trip."},
+        {"fieldname": "gps_delivery_window_end", "label": "Delivery Window End", "fieldtype": "Time", "insert_after": "gps_delivery_window_start", "fetch_from": "address.gps_delivery_window_end", "fetch_if_empty": 1, "description": "Fetched from the Customer Address; may be adjusted for this trip."},
         {"fieldname": "gps_arrived_at", "label": "Arrived At", "fieldtype": "Datetime", "insert_after": "gps_delivery_window_end"},
         {"fieldname": "gps_delivery_started_at", "label": "Delivery Started At", "fieldtype": "Datetime", "insert_after": "gps_arrived_at"},
         {"fieldname": "gps_delivery_completed_at", "label": "Delivery Completed At", "fieldtype": "Datetime", "insert_after": "gps_delivery_started_at"},
@@ -41,6 +41,11 @@ CUSTOM_FIELDS = {
         {"fieldname": "gps_coordinates_section", "label": "GPS Coordinates", "fieldtype": "Section Break", "insert_after": "disabled"},
         {"fieldname": "gps_latitude", "label": "Latitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_coordinates_section"},
         {"fieldname": "gps_longitude", "label": "Longitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_latitude"},
+    ],
+    "Address": [
+        {"fieldname": "gps_delivery_window_section", "label": "Delivery Time Slot", "fieldtype": "Section Break", "insert_after": "is_your_company_address", "description": "Default receiving time window used when this address is added to a Delivery Trip."},
+        {"fieldname": "gps_delivery_window_start", "label": "Delivery Window Start", "fieldtype": "Time", "insert_after": "gps_delivery_window_section"},
+        {"fieldname": "gps_delivery_window_end", "label": "Delivery Window End", "fieldtype": "Time", "insert_after": "gps_delivery_window_start"},
     ],
     "Driver": [
         {"fieldname": "gps_user", "label": "GPS Mobile User", "fieldtype": "Link", "options": "User", "unique": 1, "insert_after": "employee", "description": "ERPNext user account used by this driver in the Bluecore GPS app."},
