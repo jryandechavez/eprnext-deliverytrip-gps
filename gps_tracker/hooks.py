@@ -5,4 +5,7 @@ app_description = "Receives and stores locations from Bluecore GPS Android devic
 app_email = ""
 app_license = "MIT"
 
-required_apps = ["frappe"]
+required_apps = ["frappe", "erpnext"]
+
+after_install = "gps_tracker.install.after_install"
+after_migrate = "gps_tracker.install.after_migrate"

@@ -13,6 +13,35 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginStart="18dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginEnd="18dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Active Delivery Trip" android:textColor="@color/bc_text" android:textSize="18sp" android:fontFamily="sans-serif-medium" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Enter or scan the BLUECORE-TRIP code" android:textColor="@color/bc_muted" android:textSize="13sp" />
+            <EditText android:id="@+id/deliveryTrip" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="12dp" android:background="@drawable/bg_input" android:hint="MAT-DT-2026-00001" android:singleLine="true" android:textColor="@color/bc_text" />
+            <Spinner android:id="@+id/routePhase" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="10dp" android:background="@drawable/bg_input" android:entries="@array/route_phases" />
+            <Button android:id="@+id/openTripMap" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginTop="10dp" android:background="@drawable/bg_button_secondary" android:text="Open Delivery Trip Map" android:textAllCaps="false" android:textColor="@android:color/white" />
+            <Button android:id="@+id/loadTrip" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginTop="10dp" android:background="@drawable/bg_button_secondary" android:text="Load / Refresh Delivery Stops" android:textAllCaps="false" android:textColor="@android:color/white" />
+            <Spinner android:id="@+id/deliveryStop" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="10dp" android:background="@drawable/bg_input" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
+                <Button android:id="@+id/tripStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Start Trip" android:textAllCaps="false" />
+                <Button android:id="@+id/tripCompleted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="End Deliveries" android:textAllCaps="false" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
+                <Button android:id="@+id/deliveryStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Start Delivery" android:textAllCaps="false" />
+                <Button android:id="@+id/deliveryCompleted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Complete" android:textAllCaps="false" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
+                <Button android:id="@+id/returnStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Start Return" android:textAllCaps="false" />
+                <Button android:id="@+id/returnedWarehouse" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="At Warehouse" android:textAllCaps="false" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:background="@drawable/bg_header"
             android:gravity="center_vertical"
             android:orientation="horizontal"

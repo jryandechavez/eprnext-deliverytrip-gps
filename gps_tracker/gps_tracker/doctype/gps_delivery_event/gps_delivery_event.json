@@ -1,0 +1,21 @@
+{
+ "doctype": "DocType", "name": "GPS Delivery Event", "module": "GPS Tracker",
+ "autoname": "format:GDE-{#####}", "engine": "InnoDB", "track_changes": 1,
+ "field_order": ["event_id", "delivery_trip", "delivery_stop", "delivery_note", "customer", "device_id", "event_type", "recorded_at", "location_section", "latitude", "longitude", "accuracy", "remarks"],
+ "fields": [
+  {"fieldname":"event_id","label":"Event ID","fieldtype":"Data","unique":1,"hidden":1,"no_copy":1},
+  {"fieldname":"delivery_trip","label":"Delivery Trip","fieldtype":"Link","options":"Delivery Trip","reqd":1,"in_list_view":1},
+  {"fieldname":"delivery_stop","label":"Delivery Stop Row","fieldtype":"Data"},
+  {"fieldname":"delivery_note","label":"Delivery Note","fieldtype":"Link","options":"Delivery Note","in_list_view":1},
+  {"fieldname":"customer","label":"Customer","fieldtype":"Link","options":"Customer"},
+  {"fieldname":"device_id","label":"Device ID","fieldtype":"Data","reqd":1},
+  {"fieldname":"event_type","label":"Event Type","fieldtype":"Select","options":"Trip Started\nArrived\nDelivery Started\nDelivery Completed\nDelivery Failed\nDelivery Skipped\nTrip Completed\nReturn Started\nReturned to Warehouse","reqd":1,"in_list_view":1},
+  {"fieldname":"recorded_at","label":"Recorded At","fieldtype":"Datetime","reqd":1,"in_list_view":1},
+  {"fieldname":"location_section","label":"Location","fieldtype":"Section Break"},
+  {"fieldname":"latitude","label":"Latitude","fieldtype":"Float","precision":"7","reqd":1},
+  {"fieldname":"longitude","label":"Longitude","fieldtype":"Float","precision":"7","reqd":1},
+  {"fieldname":"accuracy","label":"Accuracy (m)","fieldtype":"Float"},
+  {"fieldname":"remarks","label":"Remarks","fieldtype":"Small Text"}
+ ],
+ "permissions": [{"role":"System Manager","read":1,"write":1,"create":1,"delete":1,"report":1,"export":1}]
+}

@@ -36,7 +36,7 @@ public class LocationService extends Service implements LocationListener {
     @Override public void onLocationChanged(Location l) { if(System.currentTimeMillis()-lastRecorded>=Config.intervalMs(this)) record(l); }
     private synchronized void record(Location l) {
         lastRecorded=System.currentTimeMillis();
-        String payload="{\"report_id\":"+q(UUID.randomUUID().toString())+",\"device_id\":"+q(Config.deviceId(this))+",\"latitude\":"+l.getLatitude()+",\"longitude\":"+l.getLongitude()+",\"accuracy\":"+l.getAccuracy()+",\"altitude\":"+(l.hasAltitude()?l.getAltitude():"null")+",\"speed\":"+(l.hasSpeed()?l.getSpeed():"null")+",\"bearing\":"+(l.hasBearing()?l.getBearing():"null")+",\"recorded_at\":"+q(iso(l.getTime()))+"}";
+        String payload="{\"report_id\":"+q(UUID.randomUUID().toString())+",\"device_id\":"+q(Config.deviceId(this))+",\"delivery_trip\":"+q(Config.deliveryTrip(this))+",\"route_phase\":"+q(Config.routePhase(this))+",\"latitude\":"+l.getLatitude()+",\"longitude\":"+l.getLongitude()+",\"accuracy\":"+l.getAccuracy()+",\"altitude\":"+(l.hasAltitude()?l.getAltitude():"null")+",\"speed\":"+(l.hasSpeed()?l.getSpeed():"null")+",\"bearing\":"+(l.hasBearing()?l.getBearing():"null")+",\"recorded_at\":"+q(iso(l.getTime()))+"}";
         queue.enqueue(payload,l.getTime());
         UploadScheduler.whenOnline(this);
         update("Location saved locally. "+queue.count()+" queued for upload.\n"+coords(l));
@@ -51,7 +51,8 @@ public class LocationService extends Service implements LocationListener {
             HttpURLConnection c=null;
             boolean success=false;
             try {
-                c=(HttpURLConnection)new URL(Config.url(this)).openConnection(); c.setConnectTimeout(15000); c.setReadTimeout(15000);
+                String configured=Config.url(this); int marker=configured.indexOf("/api/method/"); String base=marker>0?configured.substring(0,marker):configured;
+                c=(HttpURLConnection)new URL(base+"/api/method/"+item.method).openConnection(); c.setConnectTimeout(15000); c.setReadTimeout(15000);
                 c.setRequestMethod("POST"); c.setDoOutput(true); c.setRequestProperty("Content-Type","application/json"); c.setRequestProperty("Accept","application/json");
                 if(!Config.key(this).isEmpty()) c.setRequestProperty("Authorization","token "+Config.key(this)+":"+Config.secret(this));
                 try(OutputStream os=c.getOutputStream()){os.write(item.payload.getBytes(StandardCharsets.UTF_8));}

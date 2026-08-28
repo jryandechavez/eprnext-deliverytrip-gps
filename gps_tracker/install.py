@@ -1,0 +1,49 @@
+import frappe
+from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+
+CUSTOM_FIELDS = {
+    "Delivery Trip": [
+        {"fieldname": "gps_tracking_section", "label": "Bluecore GPS Tracking", "fieldtype": "Section Break", "insert_after": "status"},
+        {"fieldname": "gps_device_id", "label": "GPS Device ID", "fieldtype": "Data", "insert_after": "gps_tracking_section", "in_list_view": 1},
+        {"fieldname": "starting_warehouse", "label": "Starting Warehouse", "fieldtype": "Link", "options": "Warehouse", "insert_after": "gps_device_id"},
+        {"fieldname": "gps_tracking_status", "label": "GPS Tracking Status", "fieldtype": "Select", "options": "Not Started\nDelivery In Progress\nDelivery Completed\nReturning to Warehouse\nReturned to Warehouse", "default": "Not Started", "insert_after": "starting_warehouse"},
+        {"fieldname": "gps_times_column", "fieldtype": "Column Break", "insert_after": "gps_tracking_status"},
+        {"fieldname": "gps_trip_started_at", "label": "Trip Started At", "fieldtype": "Datetime", "insert_after": "gps_times_column"},
+        {"fieldname": "gps_trip_completed_at", "label": "Last Delivery Completed At", "fieldtype": "Datetime", "insert_after": "gps_trip_started_at"},
+        {"fieldname": "gps_return_started_at", "label": "Return Started At", "fieldtype": "Datetime", "insert_after": "gps_trip_completed_at"},
+        {"fieldname": "gps_returned_at", "label": "Returned to Warehouse At", "fieldtype": "Datetime", "insert_after": "gps_return_started_at"},
+    ],
+    "Delivery Stop": [
+        {"fieldname": "gps_delivery_section", "label": "Delivery Tracking", "fieldtype": "Section Break", "insert_after": "details"},
+        {"fieldname": "gps_delivery_status", "label": "Delivery Status", "fieldtype": "Select", "options": "Pending\nArrived\nDelivery Started\nCompleted\nFailed\nSkipped", "default": "Pending", "insert_after": "gps_delivery_section"},
+        {"fieldname": "gps_arrived_at", "label": "Arrived At", "fieldtype": "Datetime", "insert_after": "gps_delivery_status"},
+        {"fieldname": "gps_delivery_started_at", "label": "Delivery Started At", "fieldtype": "Datetime", "insert_after": "gps_arrived_at"},
+        {"fieldname": "gps_delivery_completed_at", "label": "Delivery Completed At", "fieldtype": "Datetime", "insert_after": "gps_delivery_started_at"},
+        {"fieldname": "gps_event_column", "fieldtype": "Column Break", "insert_after": "gps_delivery_completed_at"},
+        {"fieldname": "gps_start_latitude", "label": "Start Latitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_event_column"},
+        {"fieldname": "gps_start_longitude", "label": "Start Longitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_start_latitude"},
+        {"fieldname": "gps_completion_latitude", "label": "Completion Latitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_start_longitude"},
+        {"fieldname": "gps_completion_longitude", "label": "Completion Longitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_completion_latitude"},
+        {"fieldname": "gps_delivery_remarks", "label": "Delivery Remarks", "fieldtype": "Small Text", "insert_after": "gps_completion_longitude"},
+        {"fieldname": "gps_public_tracking_token", "label": "Public Tracking Token", "fieldtype": "Data", "unique": 1, "hidden": 1, "no_copy": 1, "insert_after": "gps_delivery_remarks"},
+        {"fieldname": "gps_public_tracking_enabled", "label": "Enable Customer Tracking", "fieldtype": "Check", "default": "0", "insert_after": "gps_public_tracking_token"},
+    ],
+    "Warehouse": [
+        {"fieldname": "gps_coordinates_section", "label": "GPS Coordinates", "fieldtype": "Section Break", "insert_after": "disabled"},
+        {"fieldname": "gps_latitude", "label": "Latitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_coordinates_section"},
+        {"fieldname": "gps_longitude", "label": "Longitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_latitude"},
+    ],
+    "GPS Location": [
+        {"fieldname": "delivery_trip", "label": "Delivery Trip", "fieldtype": "Link", "options": "Delivery Trip", "insert_after": "device_id", "in_list_view": 1},
+        {"fieldname": "route_phase", "label": "Route Phase", "fieldtype": "Select", "options": "Delivery\nReturn", "insert_after": "delivery_trip"},
+    ],
+}
+
+
+def after_install():
+    create_custom_fields(CUSTOM_FIELDS, update=True)
+
+
+def after_migrate():
+    create_custom_fields(CUSTOM_FIELDS, update=True)

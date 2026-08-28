@@ -1,0 +1,19 @@
+{% extends "templates/web.html" %}
+{% block page_content %}
+<div class="bc-public-wrap">
+  <div class="bc-public-head"><h2>Track Your Delivery</h2><p>Secure delivery information for your customer account</p></div>
+  <div id="tracking-status" class="bc-public-status">Loading delivery status…</div>
+  <div id="tracking-map" class="bc-public-map"></div>
+  <div id="tracking-details" class="bc-public-details"></div>
+</div>
+<link rel="stylesheet" href="/assets/frappe/js/lib/leaflet/leaflet.css">
+<script src="/assets/frappe/js/lib/leaflet/leaflet.js"></script>
+<script>
+(() => {
+ const token=new URLSearchParams(location.search).get("token"), status=document.getElementById("tracking-status"), details=document.getElementById("tracking-details");
+ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+ async function load(){try{const r=await fetch(`/api/method/gps_tracker.api.public_delivery_status?token=${encodeURIComponent(token||"")}`);const j=await r.json();if(!r.ok||j.exc)throw new Error();const d=j.message;status.innerHTML=`<b>${esc(d.status)}</b><span>${esc(d.company)} · ${esc(d.delivery_note||"Delivery")}</span>`;details.innerHTML=`<div><small>Estimated arrival</small><b>${esc(d.estimated_arrival||"To be confirmed")}</b></div><div><small>Last location update</small><b>${esc(d.vehicle?.recorded_at||"Waiting for driver location")}</b></div>`;if(d.destination?.latitude&&d.destination?.longitude){const map=L.map("tracking-map");L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap contributors"}).addTo(map);const pts=[];pts.push([d.destination.latitude,d.destination.longitude]);L.marker(pts[0]).addTo(map).bindPopup("Delivery destination");if(d.vehicle){pts.push([d.vehicle.latitude,d.vehicle.longitude]);L.marker(pts[1]).addTo(map).bindPopup("Delivery vehicle");L.polyline(pts,{color:"#2563eb",dashArray:"7 7"}).addTo(map)}map.fitBounds(L.latLngBounds(pts).pad(.25),{maxZoom:16})}}catch(e){status.textContent="This tracking link is invalid or unavailable.";document.getElementById("tracking-map").style.display="none";}} load();setInterval(()=>location.reload(),60000);
+})();
+</script>
+<style>.bc-public-wrap{max-width:960px;margin:30px auto;padding:0 16px}.bc-public-head{text-align:center;margin-bottom:22px}.bc-public-head p{color:#64748b}.bc-public-status,.bc-public-details{display:flex;justify-content:space-between;gap:16px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin-bottom:14px}.bc-public-status b{color:#2563eb;font-size:20px}.bc-public-status span{color:#475569}.bc-public-map{height:480px;border-radius:12px;margin-bottom:14px}.bc-public-details>div{display:flex;flex-direction:column}.bc-public-details small{color:#64748b}@media(max-width:600px){.bc-public-status,.bc-public-details{flex-direction:column}.bc-public-map{height:360px}}</style>
+{% endblock %}

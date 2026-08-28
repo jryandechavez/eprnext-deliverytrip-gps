@@ -1,0 +1,5 @@
+{
+ "doctype":"Page", "name":"delivery-trip-route", "page_name":"delivery-trip-route",
+ "title":"Delivery Trip Route", "module":"GPS Tracker", "icon":"map", "standard":"Yes", "system_page":0,
+ "roles":[{"role":"System Manager"},{"role":"Stock Manager"}]
+}
