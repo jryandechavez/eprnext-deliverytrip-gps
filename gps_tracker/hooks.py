@@ -9,3 +9,7 @@ required_apps = ["frappe", "erpnext"]
 
 after_install = "gps_tracker.install.after_install"
 after_migrate = "gps_tracker.install.after_migrate"
+
+doctype_js = {
+    "Delivery Trip": "public/js/delivery_trip.js",
+}
