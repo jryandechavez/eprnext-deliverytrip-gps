@@ -329,21 +329,23 @@ def issue_public_tracking_link(delivery_trip, delivery_stop):
 
 @frappe.whitelist()
 def issue_public_trip_route_link(delivery_trip):
-    """Create a privacy-reduced anonymous route link valid for exactly 24 hours."""
+    """Create an independent route link without invalidating earlier links."""
     _trip_permission(delivery_trip, "write")
     token = secrets.token_urlsafe(32)
     expires = frappe.utils.add_to_date(frappe.utils.now_datetime(), hours=24, as_datetime=True)
-    frappe.db.set_value("Delivery Trip", delivery_trip, {
-        "gps_public_route_token": token, "gps_public_route_expires_at": expires,
-        "gps_public_route_enabled": 1,
-    }, update_modified=False)
+    link = frappe.get_doc({
+        "doctype": "GPS Public Route Link", "delivery_trip": delivery_trip,
+        "token": token, "expires_at": expires, "enabled": 1,
+    }).insert(ignore_permissions=True)
     frappe.db.commit()
-    return {"url": frappe.utils.get_url(f"/delivery-trip-public?token={token}"), "expires_at": expires}
+    return {"name": link.name, "url": frappe.utils.get_url(f"/delivery-trip-public?token={token}"), "expires_at": expires}
 
 
 @frappe.whitelist()
 def revoke_public_trip_route_link(delivery_trip):
     _trip_permission(delivery_trip, "write")
+    for name in frappe.get_all("GPS Public Route Link", filters={"delivery_trip": delivery_trip, "enabled": 1}, pluck="name"):
+        frappe.db.set_value("GPS Public Route Link", name, "enabled", 0, update_modified=False)
     frappe.db.set_value("Delivery Trip", delivery_trip, "gps_public_route_enabled", 0, update_modified=False)
     frappe.db.commit()
 
@@ -372,12 +374,20 @@ def public_trip_route_status(token):
     token = str(token or "").strip()
     if len(token) < 32:
         frappe.throw(_("Invalid route link"), frappe.PermissionError)
-    trip_name = frappe.db.get_value("Delivery Trip", {"gps_public_route_token": token, "gps_public_route_enabled": 1}, "name")
+    link = frappe.db.get_value("GPS Public Route Link", {"token": token, "enabled": 1},
+                               ["delivery_trip", "expires_at"], as_dict=True)
+    if link:
+        trip_name, expires_at = link.delivery_trip, link.expires_at
+    else:
+        legacy = frappe.db.get_value("Delivery Trip", {"gps_public_route_token": token, "gps_public_route_enabled": 1},
+                                     ["name", "gps_public_route_expires_at"], as_dict=True)
+        trip_name = legacy.name if legacy else None
+        expires_at = legacy.gps_public_route_expires_at if legacy else None
     if not trip_name:
         frappe.throw(_("This route link is invalid or disabled"), frappe.PermissionError)
     trip = frappe.get_doc("Delivery Trip", trip_name)
-    if not trip.gps_public_route_expires_at or frappe.utils.get_datetime(trip.gps_public_route_expires_at) <= frappe.utils.now_datetime():
-        return {"ended": True, "message": _("This live delivery has ended."), "expired_at": trip.gps_public_route_expires_at}
+    if not expires_at or frappe.utils.get_datetime(expires_at) <= frappe.utils.now_datetime():
+        return {"ended": True, "message": _("This live delivery has ended."), "expired_at": expires_at}
     warehouse = None
     if trip.starting_warehouse:
         warehouse = frappe.db.get_value("Warehouse", trip.starting_warehouse, ["warehouse_name", "gps_latitude", "gps_longitude"], as_dict=True)
@@ -402,7 +412,7 @@ def public_trip_route_status(token):
     locations = frappe.get_all("GPS Location", filters={"delivery_trip": trip.name},
         fields=["latitude", "longitude", "recorded_at", "route_phase"], order_by="recorded_at asc", limit_page_length=20000)
     return {"company": trip.company, "driver": trip.driver_name or trip.driver, "vehicle": trip.vehicle,
-            "status": trip.gps_tracking_status, "expires_at": trip.gps_public_route_expires_at,
+            "status": trip.gps_tracking_status, "expires_at": expires_at,
             "warehouse": warehouse, "stops": stops, "locations": locations}
 
 

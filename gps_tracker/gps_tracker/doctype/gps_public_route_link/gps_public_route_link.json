@@ -1,0 +1,18 @@
+{
+ "doctype": "DocType",
+ "name": "GPS Public Route Link",
+ "module": "GPS Tracker",
+ "autoname": "format:GPRL-{#####}",
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "field_order": ["delivery_trip", "token", "expires_at", "enabled"],
+ "fields": [
+  {"fieldname":"delivery_trip","label":"Delivery Trip","fieldtype":"Link","options":"Delivery Trip","reqd":1,"in_list_view":1},
+  {"fieldname":"token","label":"Secure Token","fieldtype":"Data","reqd":1,"unique":1,"hidden":1,"no_copy":1},
+  {"fieldname":"expires_at","label":"Expires At","fieldtype":"Datetime","reqd":1,"in_list_view":1},
+  {"fieldname":"enabled","label":"Enabled","fieldtype":"Check","default":"1","in_list_view":1}
+ ],
+ "permissions": [
+  {"role":"System Manager","read":1,"write":1,"create":1,"delete":1,"report":1,"export":1}
+ ]
+}
