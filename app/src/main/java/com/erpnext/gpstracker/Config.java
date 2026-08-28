@@ -13,6 +13,7 @@ final class Config {
     static long intervalMs(Context c) { return Math.max(1, prefs(c).getInt("interval", 5)) * 60_000L; }
     static boolean enabled(Context c) { return prefs(c).getBoolean("enabled", false); }
     static String deliveryTrip(Context c) { return prefs(c).getString("delivery_trip", ""); }
+    static String driverId(Context c) { return prefs(c).getString("driver_id", ""); }
     static String routePhase(Context c) { return prefs(c).getString("route_phase", "Delivery"); }
     static String status(Context c) { return prefs(c).getString("last_status", "Waiting for a GPS fix…"); }
     static void status(Context c, String value) {

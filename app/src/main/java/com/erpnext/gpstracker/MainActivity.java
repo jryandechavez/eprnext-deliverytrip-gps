@@ -2,6 +2,7 @@ package com.erpnext.gpstracker;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -19,9 +20,11 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import org.json.*;
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
 
 public class MainActivity extends Activity implements SharedPreferences.OnSharedPreferenceChangeListener {
-    private EditText url, key, secret, deviceId, interval, deliveryTrip;
+    private EditText url, key, secret, deviceId, interval, deliveryTrip, driverId;
     private Spinner routePhase;
     private Spinner deliveryStop;
     private final ArrayList<String> stopIds=new ArrayList<>();
@@ -33,6 +36,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         url=findViewById(R.id.url); key=findViewById(R.id.apiKey); secret=findViewById(R.id.apiSecret);
         deviceId=findViewById(R.id.deviceId); interval=findViewById(R.id.interval);
         deliveryTrip=findViewById(R.id.deliveryTrip); routePhase=findViewById(R.id.routePhase);
+        driverId=findViewById(R.id.driverId);
         deliveryStop=findViewById(R.id.deliveryStop);
         startOnBoot=findViewById(R.id.startOnBoot); status=findViewById(R.id.status); setupStatus=findViewById(R.id.setupStatus);
         showVersion();
@@ -44,6 +48,8 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         findViewById(R.id.completeSetup).setOnClickListener(v -> completeSetup());
         findViewById(R.id.openTripMap).setOnClickListener(v -> openTripMap());
         findViewById(R.id.loadTrip).setOnClickListener(v -> loadTrip());
+        findViewById(R.id.scanTrip).setOnClickListener(v -> scanTrip());
+        findViewById(R.id.searchTrip).setOnClickListener(v -> searchTrips());
         findViewById(R.id.tripStarted).setOnClickListener(v -> queueEvent("Trip Started",false));
         findViewById(R.id.deliveryStarted).setOnClickListener(v -> queueEvent("Delivery Started",true));
         findViewById(R.id.deliveryCompleted).setOnClickListener(v -> queueEvent("Delivery Completed",true));
@@ -58,6 +64,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         deviceId.setText(p.getString("device_id", Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID)));
         interval.setText(String.valueOf(p.getInt("interval",5))); startOnBoot.setChecked(p.getBoolean("boot",true));
         deliveryTrip.setText(p.getString("delivery_trip",""));
+        driverId.setText(p.getString("driver_id",""));
         routePhase.setSelection("Return".equals(p.getString("route_phase","Delivery"))?1:0);
         refreshStatus();
     }
@@ -72,6 +79,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
             .putInt("interval",mins).putBoolean("boot",startOnBoot.isChecked()).apply();
         String trip=deliveryTrip.getText().toString().trim().replace("BLUECORE-TRIP:","");
         Config.prefs(this).edit().putString("delivery_trip",trip).putString("route_phase",routePhase.getSelectedItem().toString()).apply();
+        Config.prefs(this).edit().putString("driver_id",driverId.getText().toString().trim()).apply();
         return true;
     }
     private void openTripMap() {
@@ -83,9 +91,25 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(base+"/app/delivery-trip-route?delivery_trip="+Uri.encode(trip))));
     }
     private String baseUrl(){String e=Config.url(this);int i=e.indexOf("/api/method/");return i>0?e.substring(0,i):e;}
+    private void scanTrip(){new IntentIntegrator(this).setPrompt("Scan the Delivery Trip QR code").setBeepEnabled(false).setOrientationLocked(false).initiateScan();}
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+        IntentResult result=IntentIntegrator.parseActivityResult(requestCode,resultCode,data);
+        if(result!=null){if(result.getContents()!=null){String value=result.getContents().trim().replace("BLUECORE-TRIP:","");deliveryTrip.setText(value);save();loadTrip();}return;}
+        super.onActivityResult(requestCode,resultCode,data);
+    }
+    private void searchTrips(){
+        if(!save())return; String query=deliveryTrip.getText().toString().trim().replace("BLUECORE-TRIP:","");
+        if(Config.driverId(this).isEmpty()){toast("Enter your ERPNext Driver ID first");return;}
+        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.available_delivery_trips?device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&search="+URLEncoder.encode(query,"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();c.setRequestProperty("Authorization","token "+Config.key(this)+":"+Config.secret(this));JSONArray rows=new JSONObject(read(c.getInputStream())).getJSONArray("message");ArrayList<String> names=new ArrayList<>(),labels=new ArrayList<>();for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);String name=row.getString("name");names.add(name);labels.add(name+"\n"+row.optString("driver_name")+" · "+row.optString("status"));}runOnUiThread(()->showTripResults(names,labels));}catch(Exception e){runOnUiThread(()->toast("Unable to search trips: "+e.getMessage()));}}).start();
+    }
+    private void showTripResults(ArrayList<String> names,ArrayList<String> labels){
+        if(names.isEmpty()){toast("No available Delivery Trips found");return;}
+        new AlertDialog.Builder(this).setTitle("Select Delivery Trip").setItems(labels.toArray(new String[0]),(dialog,which)->{deliveryTrip.setText(names.get(which));save();loadTrip();}).setNegativeButton("Cancel",null).show();
+    }
     private void loadTrip(){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Enter or scan a Delivery Trip first");return;}
-        new Thread(()->{try{HttpURLConnection c=(HttpURLConnection)new URL(baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")).openConnection();c.setRequestProperty("Authorization","token "+Config.key(this)+":"+Config.secret(this));JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<String> labels=new ArrayList<>(),ids=new ArrayList<>();for(int i=0;i<stops.length();i++){JSONObject s=stops.getJSONObject(i);ids.add(s.getString("name"));labels.add((i+1)+". "+s.optString("customer")+" · "+s.optString("delivery_note"));}runOnUiThread(()->{stopIds.clear();stopIds.addAll(ids);deliveryStop.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels));toast(labels.size()+" delivery stops loaded");});}catch(Exception e){runOnUiThread(()->toast("Unable to load trip: "+e.getMessage()));}}).start();
+        if(Config.driverId(this).isEmpty()){toast("Enter your ERPNext Driver ID first");return;}
+        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();c.setRequestProperty("Authorization","token "+Config.key(this)+":"+Config.secret(this));JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<String> labels=new ArrayList<>(),ids=new ArrayList<>();for(int i=0;i<stops.length();i++){JSONObject s=stops.getJSONObject(i);ids.add(s.getString("name"));labels.add((i+1)+". "+s.optString("customer")+" · "+s.optString("delivery_note"));}runOnUiThread(()->{stopIds.clear();stopIds.addAll(ids);deliveryStop.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels));toast(labels.size()+" delivery stops loaded");});}catch(Exception e){runOnUiThread(()->toast("Unable to load trip: "+e.getMessage()));}}).start();
     }
     private void queueEvent(String type,boolean needsStop){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Select a Delivery Trip first");return;}

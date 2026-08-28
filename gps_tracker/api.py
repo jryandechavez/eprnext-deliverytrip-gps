@@ -104,11 +104,13 @@ def _trip_permission(name, ptype="read"):
 
 
 @frappe.whitelist()
-def available_delivery_trips(device_id=None, search=None):
+def available_delivery_trips(device_id=None, driver=None, search=None):
     """Trips a driver can select or resolve after scanning a QR code."""
     filters = {"docstatus": ["<", 2]}
     if device_id:
         filters["gps_device_id"] = ["in", ["", device_id]]
+    if driver:
+        filters["driver"] = str(driver).strip()
     or_filters = None
     if search:
         token = str(search).replace("BLUECORE-TRIP:", "").strip()
@@ -121,9 +123,13 @@ def available_delivery_trips(device_id=None, search=None):
 
 
 @frappe.whitelist()
-def delivery_trip_route(delivery_trip):
+def delivery_trip_route(delivery_trip, driver=None, device_id=None):
     _trip_permission(delivery_trip)
     trip = frappe.get_doc("Delivery Trip", delivery_trip)
+    if driver and trip.driver != str(driver).strip():
+        frappe.throw(_("This Delivery Trip is assigned to another driver"), frappe.PermissionError)
+    if device_id and trip.get("gps_device_id") and trip.gps_device_id != str(device_id).strip():
+        frappe.throw(_("This Delivery Trip is assigned to another device"), frappe.PermissionError)
     warehouse = None
     if trip.get("starting_warehouse"):
         warehouse = frappe.db.get_value(
