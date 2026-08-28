@@ -376,11 +376,12 @@ def public_trip_route_status(token):
         warehouse = frappe.db.get_value("Warehouse", trip.starting_warehouse, ["warehouse_name", "gps_latitude", "gps_longitude"], as_dict=True)
         if warehouse:
             warehouse.latitude, warehouse.longitude = warehouse.gps_latitude, warehouse.gps_longitude
-    stops = [{"number": row.idx, "latitude": row.lat, "longitude": row.lng,
+    stops = [{"number": row.idx, "delivery_note": row.delivery_note, "latitude": row.lat, "longitude": row.lng,
               "status": row.get("gps_delivery_status") or "Pending"} for row in trip.delivery_stops]
     locations = frappe.get_all("GPS Location", filters={"delivery_trip": trip.name},
         fields=["latitude", "longitude", "recorded_at", "route_phase"], order_by="recorded_at asc", limit_page_length=20000)
-    return {"company": trip.company, "status": trip.gps_tracking_status, "expires_at": trip.gps_public_route_expires_at,
+    return {"company": trip.company, "driver": trip.driver_name or trip.driver, "vehicle": trip.vehicle,
+            "status": trip.gps_tracking_status, "expires_at": trip.gps_public_route_expires_at,
             "warehouse": warehouse, "stops": stops, "locations": locations}
 
 
