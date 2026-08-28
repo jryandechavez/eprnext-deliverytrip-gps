@@ -45,9 +45,6 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         showVersion();
         UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this);
         load();
-        findViewById(R.id.start).setOnClickListener(v -> start(false));
-        findViewById(R.id.sendNow).setOnClickListener(v -> start(true));
-        findViewById(R.id.stop).setOnClickListener(v -> stop());
         findViewById(R.id.completeSetup).setOnClickListener(v -> completeSetup());
         findViewById(R.id.openTripMap).setOnClickListener(v -> openTripMap());
         findViewById(R.id.openRouteMap).setOnClickListener(v -> openTripMap());
@@ -61,6 +58,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         findViewById(R.id.tripCompleted).setOnClickListener(v -> confirmEnd());
         findViewById(R.id.returnStarted).setOnClickListener(v -> {routePhase.setSelection(1);save();queueEvent("Return Started","",null);});
         findViewById(R.id.returnedWarehouse).setOnClickListener(v -> queueEvent("Returned to Warehouse","",null));
+        if(Config.enabled(this)&&granted(Manifest.permission.ACCESS_FINE_LOCATION))startTrackingService();
     }
 
     private void load() {
@@ -100,7 +98,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         if(!save())return;String email=loginEmail.getText().toString().trim(),password=loginPassword.getText().toString();
         if(email.isEmpty()||password.isEmpty()){toast("Enter your ERPNext email and password");return;}
         findViewById(R.id.signIn).setEnabled(false);loginStatus.setText("Signing in securely…");
-        new Thread(()->{HttpURLConnection c=null;try{c=(HttpURLConnection)new URL(baseUrl()+"/api/method/login").openConnection();c.setConnectTimeout(15000);c.setReadTimeout(15000);c.setRequestMethod("POST");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/x-www-form-urlencoded");String form="usr="+URLEncoder.encode(email,"UTF-8")+"&pwd="+URLEncoder.encode(password,"UTF-8");try(OutputStream out=c.getOutputStream()){out.write(form.getBytes(StandardCharsets.UTF_8));}int code=c.getResponseCode();String sid="";Map<String,List<String>> headers=c.getHeaderFields();for(Map.Entry<String,List<String>> h:headers.entrySet())if(h.getKey()!=null&&"Set-Cookie".equalsIgnoreCase(h.getKey()))for(String cookie:h.getValue())if(cookie.startsWith("sid=")){int end=cookie.indexOf(';');sid=cookie.substring(4,end>4?end:cookie.length());break;}if(code<200||code>=300||sid.isEmpty())throw new IOException("Login failed (HTTP "+code+")");Config.authPrefs(this).edit().putString("session_id",sid).putString("user_email",email).apply();Config.prefs(this).edit().remove("api_key").remove("api_secret").apply();runOnUiThread(()->{loginPassword.setText("");updateLoginStatus();toast("Signed in successfully");});}catch(Exception e){runOnUiThread(()->{loginPassword.setText("");loginStatus.setText("Sign-in failed");toast("Unable to sign in: check email, password, and server");});}finally{if(c!=null)c.disconnect();runOnUiThread(()->findViewById(R.id.signIn).setEnabled(true));}}).start();
+        new Thread(()->{HttpURLConnection c=null;try{c=(HttpURLConnection)new URL(baseUrl()+"/api/method/login").openConnection();c.setConnectTimeout(15000);c.setReadTimeout(15000);c.setRequestMethod("POST");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/x-www-form-urlencoded");String form="usr="+URLEncoder.encode(email,"UTF-8")+"&pwd="+URLEncoder.encode(password,"UTF-8");try(OutputStream out=c.getOutputStream()){out.write(form.getBytes(StandardCharsets.UTF_8));}int code=c.getResponseCode();String sid="";Map<String,List<String>> headers=c.getHeaderFields();for(Map.Entry<String,List<String>> h:headers.entrySet())if(h.getKey()!=null&&"Set-Cookie".equalsIgnoreCase(h.getKey()))for(String cookie:h.getValue())if(cookie.startsWith("sid=")){int end=cookie.indexOf(';');sid=cookie.substring(4,end>4?end:cookie.length());break;}if(code<200||code>=300||sid.isEmpty())throw new IOException("Login failed (HTTP "+code+")");Config.authPrefs(this).edit().putString("session_id",sid).putString("user_email",email).apply();Config.prefs(this).edit().remove("api_key").remove("api_secret").putBoolean("enabled",true).apply();runOnUiThread(()->{loginPassword.setText("");updateLoginStatus();if(granted(Manifest.permission.ACCESS_FINE_LOCATION))startTrackingService();else completeSetup();toast("Signed in. GPS tracking is automatic.");});}catch(Exception e){runOnUiThread(()->{loginPassword.setText("");loginStatus.setText("Sign-in failed");toast("Unable to sign in: check email, password, and server");});}finally{if(c!=null)c.disconnect();runOnUiThread(()->findViewById(R.id.signIn).setEnabled(true));}}).start();
     }
     private void signOut(){Config.authPrefs(this).edit().clear().apply();loginPassword.setText("");loginEmail.setText("");updateLoginStatus();toast("Signed out");}
     private void scanTrip(){new IntentIntegrator(this).setPrompt("Scan the Delivery Trip QR code").setBeepEnabled(false).setOrientationLocked(false).initiateScan();}
@@ -151,6 +149,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(i); else startService(i);
         refreshStatus();
     }
+    private void startTrackingService(){Config.prefs(this).edit().putBoolean("enabled",true).apply();Intent intent=new Intent(this,LocationService.class).setAction(LocationService.ACTION_START);if(Build.VERSION.SDK_INT>=26)startForegroundService(intent);else startService(intent);refreshStatus();}
     private void stop() { Config.prefs(this).edit().putBoolean("enabled",false).apply(); Config.status(this,"Tracking is stopped."); stopService(new Intent(this,LocationService.class)); refreshStatus(); }
     private void refreshStatus() { status.setText(Config.enabled(this) ? Config.status(this) : "Tracking is stopped."); }
     @Override protected void onResume() { super.onResume(); Config.prefs(this).registerOnSharedPreferenceChangeListener(this); refreshStatus(); refreshSetup(); }
