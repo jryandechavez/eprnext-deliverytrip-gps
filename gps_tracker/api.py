@@ -191,7 +191,17 @@ def _geocode_text(text):
     response = requests.get("https://nominatim.openstreetmap.org/search", params={"q": query, "format": "jsonv2", "limit": 1, "countrycodes": "ph"}, headers={"User-Agent": "Bluecore-ERPNext-Delivery-GPS/1.0"}, timeout=20)
     response.raise_for_status()
     rows = response.json()
-    return (float(rows[0]["lat"]), float(rows[0]["lon"])) if rows else None
+    if rows:
+        return (float(rows[0]["lat"]), float(rows[0]["lon"]))
+    upper = query.upper()
+    landmark_points = {
+        "EASTWOOD": (14.6110189, 121.0798088),
+        "SHANGRI": (14.5814308, 121.0551446),
+        "ARCOVIA": (14.5773636, 121.0757816),
+        "ESTANCIA": (14.5754230, 121.0630400),
+        "OPUS": (14.5929242, 121.0810085),
+    }
+    return next((point for landmark, point in landmark_points.items() if landmark in upper), None)
 
 
 @frappe.whitelist()
