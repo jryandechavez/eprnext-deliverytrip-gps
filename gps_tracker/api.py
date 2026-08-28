@@ -103,14 +103,24 @@ def _trip_permission(name, ptype="read"):
         frappe.throw(_("You do not have permission for Delivery Trip {0}").format(name), frappe.PermissionError)
 
 
+def _mobile_driver(driver=None):
+    """Resolve and validate the Driver linked to the authenticated ERPNext user."""
+    linked = frappe.db.get_value("Driver", {"gps_user": frappe.session.user}, "name")
+    requested = str(driver or "").strip()
+    if linked and requested and linked != requested and "System Manager" not in frappe.get_roles():
+        frappe.throw(_("The selected Driver is not linked to your user account"), frappe.PermissionError)
+    return linked or requested
+
+
 @frappe.whitelist()
 def available_delivery_trips(device_id=None, driver=None, search=None):
     """Trips a driver can select or resolve after scanning a QR code."""
     filters = {"docstatus": ["<", 2]}
     if device_id:
         filters["gps_device_id"] = ["in", ["", device_id]]
+    driver = _mobile_driver(driver)
     if driver:
-        filters["driver"] = str(driver).strip()
+        filters["driver"] = driver
     or_filters = None
     if search:
         token = str(search).replace("BLUECORE-TRIP:", "").strip()
@@ -126,7 +136,8 @@ def available_delivery_trips(device_id=None, driver=None, search=None):
 def delivery_trip_route(delivery_trip, driver=None, device_id=None):
     _trip_permission(delivery_trip)
     trip = frappe.get_doc("Delivery Trip", delivery_trip)
-    if driver and trip.driver != str(driver).strip():
+    driver = _mobile_driver(driver)
+    if driver and trip.driver != driver:
         frappe.throw(_("This Delivery Trip is assigned to another driver"), frappe.PermissionError)
     if device_id and trip.get("gps_device_id") and trip.gps_device_id != str(device_id).strip():
         frappe.throw(_("This Delivery Trip is assigned to another device"), frappe.PermissionError)

@@ -34,6 +34,9 @@ CUSTOM_FIELDS = {
         {"fieldname": "gps_latitude", "label": "Latitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_coordinates_section"},
         {"fieldname": "gps_longitude", "label": "Longitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_latitude"},
     ],
+    "Driver": [
+        {"fieldname": "gps_user", "label": "GPS Mobile User", "fieldtype": "Link", "options": "User", "unique": 1, "insert_after": "employee", "description": "ERPNext user account used by this driver in the Bluecore GPS app."},
+    ],
     "GPS Location": [
         {"fieldname": "delivery_trip", "label": "Delivery Trip", "fieldtype": "Link", "options": "Delivery Trip", "insert_after": "device_id", "in_list_view": 1},
         {"fieldname": "route_phase", "label": "Route Phase", "fieldtype": "Select", "options": "Delivery\nReturn", "insert_after": "delivery_trip"},
