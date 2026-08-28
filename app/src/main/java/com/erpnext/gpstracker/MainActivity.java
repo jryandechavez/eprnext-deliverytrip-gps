@@ -4,11 +4,17 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.location.Location;
 import android.net.Uri;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.os.Bundle;
 import android.os.Build;
 import android.os.PowerManager;
@@ -30,13 +36,15 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     private Spinner routePhase;
     private LinearLayout deliveryList;
     private TextView deliverySummary;
-    private Button showAllButton;
+    private CheckBox showAllButton;
+    private TextView connectivityStatus;
     private WebView routeMapPreview;
     private final ArrayList<JSONObject> deliveryRows=new ArrayList<>();
     private JSONObject cachedTripData;
     private boolean showAll=false;
     private CheckBox startOnBoot;
     private TextView status, setupStatus, loginStatus;
+    private final BroadcastReceiver connectivityReceiver=new BroadcastReceiver(){@Override public void onReceive(Context context,Intent intent){updateConnectivityStatus();}};
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); setContentView(R.layout.activity_main);
@@ -44,7 +52,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         deviceId=findViewById(R.id.deviceId); interval=findViewById(R.id.interval);
         deliveryTrip=findViewById(R.id.deliveryTrip); routePhase=findViewById(R.id.routePhase);
         driverId=findViewById(R.id.driverId);
-        deliveryList=findViewById(R.id.deliveryList); deliverySummary=findViewById(R.id.deliverySummary); showAllButton=findViewById(R.id.showAllDeliveries);
+        deliveryList=findViewById(R.id.deliveryList); deliverySummary=findViewById(R.id.deliverySummary); showAllButton=findViewById(R.id.showAllDeliveries);connectivityStatus=findViewById(R.id.connectivityStatus);
         routeMapPreview=findViewById(R.id.routeMapPreview);routeMapPreview.getSettings().setJavaScriptEnabled(true);routeMapPreview.getSettings().setDomStorageEnabled(true);routeMapPreview.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
         startOnBoot=findViewById(R.id.startOnBoot); status=findViewById(R.id.status); setupStatus=findViewById(R.id.setupStatus);
         showVersion();
@@ -58,7 +66,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         findViewById(R.id.loadTrip).setOnClickListener(v -> loadTrip());
         findViewById(R.id.scanTrip).setOnClickListener(v -> scanTrip());
         findViewById(R.id.searchTrip).setOnClickListener(v -> searchTrips());
-        showAllButton.setOnClickListener(v->{showAll=!showAll;showAllButton.setText(showAll?"Show Ongoing":"Show All");renderDeliveries();});
+        showAllButton.setOnCheckedChangeListener((button,checked)->{showAll=checked;renderDeliveries();});
         findViewById(R.id.signIn).setOnClickListener(v -> signIn());
         findViewById(R.id.signOut).setOnClickListener(v -> signOut());
         findViewById(R.id.tripStarted).setOnClickListener(v -> confirmStart());
@@ -187,7 +195,9 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     private void startTrackingService(){Config.prefs(this).edit().putBoolean("enabled",true).apply();Intent intent=new Intent(this,LocationService.class).setAction(LocationService.ACTION_START);if(Build.VERSION.SDK_INT>=26)startForegroundService(intent);else startService(intent);refreshStatus();}
     private void stop() { Config.prefs(this).edit().putBoolean("enabled",false).apply(); Config.status(this,"Tracking is stopped."); stopService(new Intent(this,LocationService.class)); refreshStatus(); }
     private void refreshStatus() { status.setText(Config.enabled(this) ? Config.status(this) : "Tracking is stopped."); }
-    @Override protected void onResume() { super.onResume(); Config.prefs(this).registerOnSharedPreferenceChangeListener(this); refreshStatus(); refreshSetup(); }
+    @Override protected void onStart(){super.onStart();IntentFilter filter=new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);if(Build.VERSION.SDK_INT>=33)registerReceiver(connectivityReceiver,filter,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(connectivityReceiver,filter);updateConnectivityStatus();}
+    @Override protected void onStop(){try{unregisterReceiver(connectivityReceiver);}catch(Exception ignored){}super.onStop();}
+    @Override protected void onResume() { super.onResume(); Config.prefs(this).registerOnSharedPreferenceChangeListener(this); refreshStatus(); refreshSetup();updateConnectivityStatus(); }
     @Override protected void onPause() { Config.prefs(this).unregisterOnSharedPreferenceChangeListener(this); super.onPause(); }
     @Override public void onSharedPreferenceChanged(SharedPreferences prefs,String keyName) { if("last_status".equals(keyName) || "enabled".equals(keyName)) runOnUiThread(this::refreshStatus); }
     private void toast(String s) { Toast.makeText(this,s,Toast.LENGTH_LONG).show(); }
@@ -196,6 +206,8 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     private boolean batteryUnrestricted() { PowerManager manager=(PowerManager)getSystemService(POWER_SERVICE); return manager!=null && manager.isIgnoringBatteryOptimizations(getPackageName()); }
     private boolean backgroundGranted() { return Build.VERSION.SDK_INT<29 || granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION); }
     private boolean notificationsGranted() { return Build.VERSION.SDK_INT<33 || granted(Manifest.permission.POST_NOTIFICATIONS); }
+    private boolean online(){ConnectivityManager manager=(ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);if(manager==null)return false;Network network=manager.getActiveNetwork();NetworkCapabilities capabilities=network==null?null:manager.getNetworkCapabilities(network);return capabilities!=null&&capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)&&capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);}
+    private void updateConnectivityStatus(){if(connectivityStatus==null)return;boolean connected=online();connectivityStatus.setText(connected?"● ONLINE · Automatic sync active":"● OFFLINE · GPS and deliveries saved locally");connectivityStatus.setTextColor(getColor(connected?R.color.bc_success:R.color.bc_danger));if(connected)UploadScheduler.whenOnline(this);}
     private void refreshSetup() {
         boolean precise=granted(Manifest.permission.ACCESS_FINE_LOCATION), background=backgroundGranted(), notifications=notificationsGranted(), gps=gpsEnabled(), battery=batteryUnrestricted();
         setupStatus.setText((precise?"✓":"•")+" Precise location\n"+(background?"✓":"•")+" Background location (Allow all the time)\n"+(notifications?"✓":"•")+" Tracking notification\n"+(gps?"✓":"•")+" GPS enabled\n"+(battery?"✓":"•")+" Battery optimization disabled\n• OEM Autostart: verify in App settings");
