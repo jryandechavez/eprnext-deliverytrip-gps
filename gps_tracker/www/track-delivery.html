@@ -1,5 +1,9 @@
 {% extends "templates/web.html" %}
 {% block page_content %}
+{% if frappe.session.user == "Guest" %}
+<script>window.location.replace("/login?redirect-to=" + encodeURIComponent(window.location.pathname + window.location.search));</script>
+<noscript><a href="/login">Log in to track your delivery</a></noscript>
+{% else %}
 <div class="bc-public-wrap">
   <div class="bc-public-head"><h2>Track Your Delivery</h2><p>Secure delivery information for your customer account</p></div>
   <div id="tracking-status" class="bc-public-status">Loading delivery status…</div>
@@ -16,4 +20,5 @@
 })();
 </script>
 <style>.bc-public-wrap{max-width:960px;margin:30px auto;padding:0 16px}.bc-public-head{text-align:center;margin-bottom:22px}.bc-public-head p{color:#64748b}.bc-public-status,.bc-public-details{display:flex;justify-content:space-between;gap:16px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin-bottom:14px}.bc-public-status b{color:#2563eb;font-size:20px}.bc-public-status span{color:#475569}.bc-public-map{height:480px;border-radius:12px;margin-bottom:14px}.bc-public-details>div{display:flex;flex-direction:column}.bc-public-details small{color:#64748b}@media(max-width:600px){.bc-public-status,.bc-public-details{flex-direction:column}.bc-public-map{height:360px}}</style>
+{% endif %}
 {% endblock %}
