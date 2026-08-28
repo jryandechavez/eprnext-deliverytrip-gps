@@ -147,7 +147,7 @@ def delivery_trip_route(delivery_trip, driver=None, device_id=None):
     if trip.get("starting_warehouse"):
         warehouse = frappe.db.get_value(
             "Warehouse", trip.starting_warehouse,
-            ["name", "warehouse_name", "gps_latitude", "gps_longitude"], as_dict=True,
+            ["name", "warehouse_name", "address_line_1", "address_line_2", "city", "state", "pin", "gps_latitude", "gps_longitude"], as_dict=True,
         )
         if warehouse:
             warehouse["latitude"] = warehouse.get("gps_latitude")

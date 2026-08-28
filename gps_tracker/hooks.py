@@ -13,3 +13,8 @@ after_migrate = "gps_tracker.install.after_migrate"
 doctype_js = {
     "Delivery Trip": "public/js/delivery_trip.js",
 }
+
+doc_events = {
+    "Company": {"validate": "gps_tracker.events.set_company_warehouse_address"},
+    "Delivery Trip": {"validate": "gps_tracker.events.set_delivery_trip_start"},
+}
