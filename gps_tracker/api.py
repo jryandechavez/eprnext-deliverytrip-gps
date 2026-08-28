@@ -320,6 +320,51 @@ def issue_public_tracking_link(delivery_trip, delivery_stop):
     return frappe.utils.get_url(f"/track-delivery?token={token}")
 
 
+@frappe.whitelist()
+def issue_public_trip_route_link(delivery_trip):
+    """Create a privacy-reduced anonymous route link valid for exactly 24 hours."""
+    _trip_permission(delivery_trip, "write")
+    token = secrets.token_urlsafe(32)
+    expires = frappe.utils.add_to_date(frappe.utils.now_datetime(), hours=24, as_datetime=True)
+    frappe.db.set_value("Delivery Trip", delivery_trip, {
+        "gps_public_route_token": token, "gps_public_route_expires_at": expires,
+        "gps_public_route_enabled": 1,
+    }, update_modified=False)
+    frappe.db.commit()
+    return {"url": frappe.utils.get_url(f"/delivery-trip-public?token={token}"), "expires_at": expires}
+
+
+@frappe.whitelist()
+def revoke_public_trip_route_link(delivery_trip):
+    _trip_permission(delivery_trip, "write")
+    frappe.db.set_value("Delivery Trip", delivery_trip, "gps_public_route_enabled", 0, update_modified=False)
+    frappe.db.commit()
+
+
+@frappe.whitelist(allow_guest=True)
+def public_trip_route_status(token):
+    token = str(token or "").strip()
+    if len(token) < 32:
+        frappe.throw(_("Invalid route link"), frappe.PermissionError)
+    trip_name = frappe.db.get_value("Delivery Trip", {"gps_public_route_token": token, "gps_public_route_enabled": 1}, "name")
+    if not trip_name:
+        frappe.throw(_("This route link is invalid or disabled"), frappe.PermissionError)
+    trip = frappe.get_doc("Delivery Trip", trip_name)
+    if not trip.gps_public_route_expires_at or frappe.utils.get_datetime(trip.gps_public_route_expires_at) <= frappe.utils.now_datetime():
+        frappe.throw(_("This 24-hour route link has expired"), frappe.PermissionError)
+    warehouse = None
+    if trip.starting_warehouse:
+        warehouse = frappe.db.get_value("Warehouse", trip.starting_warehouse, ["warehouse_name", "gps_latitude", "gps_longitude"], as_dict=True)
+        if warehouse:
+            warehouse.latitude, warehouse.longitude = warehouse.gps_latitude, warehouse.gps_longitude
+    stops = [{"number": row.idx, "latitude": row.lat, "longitude": row.lng,
+              "status": row.get("gps_delivery_status") or "Pending"} for row in trip.delivery_stops]
+    locations = frappe.get_all("GPS Location", filters={"delivery_trip": trip.name},
+        fields=["latitude", "longitude", "recorded_at", "route_phase"], order_by="recorded_at asc", limit_page_length=20000)
+    return {"company": trip.company, "status": trip.gps_tracking_status, "expires_at": trip.gps_public_route_expires_at,
+            "warehouse": warehouse, "stops": stops, "locations": locations}
+
+
 def _customer_can_track(customer, trip_name):
     if frappe.session.user == "Guest":
         return False

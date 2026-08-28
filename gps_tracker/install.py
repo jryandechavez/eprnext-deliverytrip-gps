@@ -15,6 +15,10 @@ CUSTOM_FIELDS = {
         {"fieldname": "gps_trip_completed_at", "label": "Last Delivery Completed At", "fieldtype": "Datetime", "insert_after": "gps_trip_started_at"},
         {"fieldname": "gps_return_started_at", "label": "Return Started At", "fieldtype": "Datetime", "insert_after": "gps_trip_completed_at"},
         {"fieldname": "gps_returned_at", "label": "Returned to Warehouse At", "fieldtype": "Datetime", "insert_after": "gps_return_started_at"},
+        {"fieldname": "gps_public_route_section", "label": "24-Hour Public Route", "fieldtype": "Section Break", "insert_after": "gps_returned_at"},
+        {"fieldname": "gps_public_route_token", "label": "Public Route Token", "fieldtype": "Data", "unique": 1, "hidden": 1, "no_copy": 1, "insert_after": "gps_public_route_section"},
+        {"fieldname": "gps_public_route_expires_at", "label": "Public Route Expires At", "fieldtype": "Datetime", "read_only": 1, "insert_after": "gps_public_route_token"},
+        {"fieldname": "gps_public_route_enabled", "label": "Public Route Enabled", "fieldtype": "Check", "read_only": 1, "default": "0", "insert_after": "gps_public_route_expires_at"},
     ],
     "Delivery Stop": [
         {"fieldname": "gps_delivery_section", "label": "Delivery Tracking", "fieldtype": "Section Break", "insert_after": "details"},
