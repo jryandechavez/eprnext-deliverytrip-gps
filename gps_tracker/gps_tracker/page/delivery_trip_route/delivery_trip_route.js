@@ -13,6 +13,7 @@ class DeliveryTripRoute {
         this.page = frappe.ui.make_app_page({parent: wrapper, title: __("Delivery Trip Route"), single_column: true});
         this.trip = this.page.add_field({fieldname:"delivery_trip",label:__("Delivery Trip"),fieldtype:"Link",options:"Delivery Trip",reqd:1,change:()=>this.load()});
         this.page.set_primary_action(__("Refresh"),()=>this.load(),"refresh");
+        this.page.add_inner_button(__("Populate Coordinates"),()=>this.populate_coordinates(),__("Route Tools"));
         this.$root=$(this.page.body).append(`<div class="bc-trip-summary"></div><div class="bc-trip-layout"><div class="bc-trip-map"></div><div class="bc-trip-stops"></div></div>`);
         this.$map=this.$root.find(".bc-trip-map"); this.$stops=this.$root.find(".bc-trip-stops");
         frappe.require(["/assets/frappe/js/lib/leaflet/leaflet.css","/assets/frappe/js/lib/leaflet/leaflet.js"], () => {
@@ -32,8 +33,10 @@ class DeliveryTripRoute {
     }
     async render() {
         if(this.map)this.map.remove(); this.$map.empty();
-        const d=this.data, valid=p=>p&&Number.isFinite(Number(p.latitude))&&Number.isFinite(Number(p.longitude));
+        const d=this.data, valid=p=>p&&Number.isFinite(Number(p.latitude))&&Number.isFinite(Number(p.longitude))&&(Math.abs(Number(p.latitude))>0.0001||Math.abs(Number(p.longitude))>0.0001);
         const planned=[d.warehouse,...d.stops].filter(valid), delivery=d.locations.filter(p=>p.route_phase!=="Return"&&valid(p)), returned=d.locations.filter(p=>p.route_phase==="Return"&&valid(p));
+        const missing=(d.warehouse&&!valid(d.warehouse)?1:0)+d.stops.filter(s=>!valid(s)).length;
+        if(missing)frappe.show_alert({message:__("{0} route locations need coordinates. Use Route Tools → Populate Coordinates.",[missing]),indicator:"orange"},8);
         this.map=L.map(this.$map[0]); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap contributors"}).addTo(this.map);
         if(d.warehouse&&valid(d.warehouse))this.marker(d.warehouse,"W","bc-warehouse",__("Starting Warehouse: {0}",[d.warehouse.warehouse_name||d.warehouse.name]));
         d.stops.filter(valid).forEach((s,i)=>this.marker(s,String(i+1),"bc-stop-marker",`${s.customer||""}<br>${s.delivery_note||""}`));
@@ -53,6 +56,7 @@ class DeliveryTripRoute {
         const coords=points.map(p=>`${p.longitude},${p.latitude}`).join(";");
         try{const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);const j=await r.json();return j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);}catch(e){frappe.show_alert({message:__("Road routing unavailable; showing straight planned line."),indicator:"orange"});return points.map(p=>[p.latitude,p.longitude]);}
     }
+    async populate_coordinates(){const name=this.trip.get_value();if(!name)return;const r=await frappe.call({method:"gps_tracker.api.populate_delivery_trip_coordinates",args:{delivery_trip:name},freeze:true,freeze_message:__("Populating route coordinates…")});const result=r.message||{};frappe.msgprint({title:__("Coordinate Results"),message:__("Updated: {0}<br>Unresolved: {1}",[(result.updated||[]).length,(result.unresolved||[]).length]),indicator:(result.unresolved||[]).length?"orange":"green"});await this.load();}
     marker(p,label,klass,title){return L.marker([p.latitude,p.longitude],{icon:L.divIcon({className:"",html:`<div class="bc-marker ${klass}">${label}</div>`,iconSize:[28,28],iconAnchor:[14,14]})}).addTo(this.map).bindPopup(title);}
     cards(items){return items.map(([k,v])=>`<div class="bc-trip-card"><small>${k}</small><strong>${frappe.utils.escape_html(String(v))}</strong></div>`).join("");}
 }

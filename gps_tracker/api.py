@@ -1,5 +1,7 @@
 import math
 import secrets
+import time
+import requests
 from datetime import timedelta
 
 import frappe
@@ -180,6 +182,42 @@ def delivery_trip_route(delivery_trip, driver=None, device_id=None):
                  "starting_warehouse": trip.get("starting_warehouse")},
         "warehouse": warehouse, "stops": stops, "locations": locations, "events": events,
     }
+
+
+def _geocode_text(text):
+    query = frappe.utils.strip_html(text or "").replace("\n", ", ").strip(" ,")
+    if not query:
+        return None
+    response = requests.get("https://nominatim.openstreetmap.org/search", params={"q": query, "format": "jsonv2", "limit": 1, "countrycodes": "ph"}, headers={"User-Agent": "Bluecore-ERPNext-Delivery-GPS/1.0"}, timeout=20)
+    response.raise_for_status()
+    rows = response.json()
+    return (float(rows[0]["lat"]), float(rows[0]["lon"])) if rows else None
+
+
+@frappe.whitelist()
+def populate_delivery_trip_coordinates(delivery_trip):
+    _trip_permission(delivery_trip, "write")
+    trip = frappe.get_doc("Delivery Trip", delivery_trip)
+    updated, unresolved = [], []
+    warehouse = frappe.get_doc("Warehouse", trip.starting_warehouse) if trip.get("starting_warehouse") else None
+    if not warehouse:
+        unresolved.append(_("Starting Warehouse is not configured"))
+    elif not warehouse.get("gps_latitude") or not warehouse.get("gps_longitude"):
+        address = ", ".join(filter(None, [warehouse.address_line_1, warehouse.address_line_2, warehouse.city, warehouse.state, warehouse.pin, "Philippines"]))
+        point = _geocode_text(address)
+        if point:
+            warehouse.db_set({"gps_latitude": point[0], "gps_longitude": point[1]}, update_modified=False); updated.append(warehouse.name)
+        else: unresolved.append(warehouse.name)
+        time.sleep(1.05)
+    for stop in trip.delivery_stops:
+        if stop.lat and stop.lng: continue
+        point = _geocode_text(stop.customer_address)
+        if point:
+            frappe.db.set_value("Delivery Stop", stop.name, {"lat": point[0], "lng": point[1]}, update_modified=False); updated.append(stop.delivery_note or stop.customer or stop.name)
+        else: unresolved.append(stop.delivery_note or stop.customer or stop.name)
+        time.sleep(1.05)
+    frappe.db.commit()
+    return {"updated": updated, "unresolved": unresolved}
 
 
 EVENT_RULES = {
