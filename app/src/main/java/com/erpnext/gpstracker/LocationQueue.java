@@ -4,6 +4,9 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import java.util.HashSet;
+import java.util.Set;
+import org.json.JSONObject;
 
 final class LocationQueue extends SQLiteOpenHelper {
     static final class Item {
@@ -50,5 +53,12 @@ final class LocationQueue extends SQLiteOpenHelper {
     }
     synchronized String cachedTrip(String tripName) {
         try(Cursor cursor=getReadableDatabase().query("cached_trips",new String[]{"payload"},"trip_name=?",new String[]{tripName},null,null,null,"1")) { return cursor.moveToFirst()?cursor.getString(0):null; }
+    }
+    synchronized Set<String> pendingCompletedStops(String tripName) {
+        HashSet<String> stops=new HashSet<>();
+        try(Cursor cursor=getReadableDatabase().query("pending_locations",new String[]{"payload"},"method=?",new String[]{"gps_tracker.api.delivery_event"},null,null,"created_at ASC")) {
+            while(cursor.moveToNext())try{JSONObject event=new JSONObject(cursor.getString(0));if(tripName.equals(event.optString("delivery_trip"))&&"Delivery Completed".equals(event.optString("event_type")))stops.add(event.optString("delivery_stop"));}catch(Exception ignored){}
+        }
+        return stops;
     }
 }
