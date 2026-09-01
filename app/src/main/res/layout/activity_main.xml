@@ -50,16 +50,16 @@
             <CheckBox android:id="@+id/showAllDeliveries" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="end" android:layout_marginTop="6dp" android:buttonTint="@color/bc_blue" android:text="Show completed deliveries" android:textColor="@color/bc_text" android:textSize="14sp" />
             <LinearLayout android:id="@+id/deliveryList" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
-                <Button android:id="@+id/tripStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Start Trip" android:textAllCaps="false" />
-                <Button android:id="@+id/tripCompleted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="End Deliveries" android:textAllCaps="false" />
+                <Button android:id="@+id/tripStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:minWidth="0dp" android:paddingStart="2dp" android:paddingEnd="2dp" android:singleLine="true" android:text="Start Trip" android:textAllCaps="false" android:textSize="@dimen/bc_trip_action_text_size" />
+                <Button android:id="@+id/tripCompleted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:minWidth="0dp" android:paddingStart="2dp" android:paddingEnd="2dp" android:singleLine="true" android:text="End Deliveries" android:textAllCaps="false" android:textSize="@dimen/bc_trip_action_text_size" />
             </LinearLayout>
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
                 <Button android:id="@+id/deliveryStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Start Delivery" android:textAllCaps="false" android:visibility="gone" />
                 <Button android:id="@+id/deliveryCompleted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Complete" android:textAllCaps="false" android:visibility="gone" />
             </LinearLayout>
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
-                <Button android:id="@+id/returnStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Start Return" android:textAllCaps="false" />
-                <Button android:id="@+id/returnedWarehouse" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="At Warehouse" android:textAllCaps="false" />
+                <Button android:id="@+id/returnStarted" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:minWidth="0dp" android:paddingStart="2dp" android:paddingEnd="2dp" android:singleLine="true" android:text="Start Return" android:textAllCaps="false" android:textSize="@dimen/bc_trip_action_text_size" />
+                <Button android:id="@+id/returnedWarehouse" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:minWidth="0dp" android:paddingStart="2dp" android:paddingEnd="2dp" android:singleLine="true" android:text="At Warehouse" android:textAllCaps="false" android:textSize="@dimen/bc_trip_action_text_size" />
             </LinearLayout>
         </LinearLayout>
 
