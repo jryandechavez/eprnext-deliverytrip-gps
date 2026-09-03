@@ -33,10 +33,23 @@
             android:layout_marginEnd="18dp"
             android:background="@drawable/bg_card"
             android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PUSH TO TALK" android:textColor="@color/bc_blue" android:textStyle="bold" />
+            <TextView android:id="@+id/pttStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Sign in to join the company-wide radio channel" android:textColor="@color/bc_muted" />
+            <Button android:id="@+id/pttButton" android:layout_width="match_parent" android:layout_height="72dp" android:layout_marginTop="12dp" android:background="@drawable/bg_button_primary" android:text="Hold to Talk" android:textAllCaps="false" android:textColor="@android:color/white" android:textSize="20sp" android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="18dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginEnd="18dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical">
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Active Delivery Trip" android:textColor="@color/bc_text" android:textSize="18sp" android:fontFamily="sans-serif-medium" />
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Enter or scan the Delivery Trip code" android:textColor="@color/bc_muted" android:textSize="13sp" />
             <TextView android:id="@+id/connectivityStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="@drawable/bg_status" android:text="● CHECKING CONNECTION" android:textColor="@color/bc_muted" android:textSize="13sp" android:textStyle="bold" />
-            <EditText android:id="@+id/driverId" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="12dp" android:background="@drawable/bg_input" android:hint="Driver ID (automatic from ERPNext user)" android:singleLine="true" android:textColor="@color/bc_text" />
+            <EditText android:id="@+id/driverId" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="12dp" android:background="@drawable/bg_input" android:hint="Driver ID (automatic from ERPNext user)" android:singleLine="true" android:textColor="@color/bc_text" android:visibility="gone" />
             <EditText android:id="@+id/deliveryTrip" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="12dp" android:background="@drawable/bg_input" android:hint="MAT-DT-2026-00001" android:singleLine="true" android:textColor="@color/bc_text" />
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
                 <Button android:id="@+id/scanTrip" android:layout_width="0dp" android:layout_height="50dp" android:layout_marginEnd="5dp" android:layout_weight="1" android:background="@drawable/bg_button_primary" android:text="Scan QR" android:textAllCaps="false" android:textColor="@android:color/white" />

@@ -1,4 +1,5 @@
 import math
+import base64
 import hashlib
 import json
 import secrets
@@ -8,6 +9,67 @@ from datetime import timedelta
 
 import frappe
 from frappe import _
+
+
+PTT_MAX_BYTES = 300000
+
+
+@frappe.whitelist()
+def ptt_send(device_id=None, audio=None):
+    """Store a short AMR push-to-talk transmission as a private File."""
+    data = _request_data()
+    device_id = str(data.get("device_id", device_id) or "").strip()
+    encoded = data.get("audio", audio) or ""
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Sign in is required for Push to Talk"), frappe.PermissionError)
+    try:
+        content = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError):
+        frappe.throw(_("Audio payload is invalid"))
+    if not content or len(content) > PTT_MAX_BYTES:
+        frappe.throw(_("Voice messages must be between 1 and {0} bytes").format(PTT_MAX_BYTES))
+    token = secrets.token_hex(8)
+    file_doc = frappe.get_doc({
+        "doctype": "File", "file_name": f"ptt-{device_id or 'radio'}-{token}.amr",
+        "is_private": 1, "content": content,
+    }).insert(ignore_permissions=True)
+    frappe.db.commit()
+    return {"cursor": str(file_doc.creation), "name": file_doc.name}
+
+
+@frappe.whitelist()
+def ptt_poll(after=None, device_id=None):
+    """Return new company radio transmissions, excluding the requesting device."""
+    data = _request_data()
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Sign in is required for Push to Talk"), frappe.PermissionError)
+    after = str(data.get("after", after) or "").strip()
+    device_id = str(data.get("device_id", device_id) or "").strip()
+    filters = {"file_name": ["like", "ptt-%.amr"]}
+    if not after:
+        latest = frappe.get_all("File", filters=filters, fields=["creation"],
+                                order_by="creation desc", limit_page_length=1)
+        return {"cursor": str(latest[0].creation) if latest else frappe.utils.now_datetime().isoformat(),
+                "messages": []}
+    if after:
+        filters["creation"] = [">", after]
+    rows = frappe.get_all("File", filters=filters, fields=["name", "file_name", "creation"],
+                          order_by="creation asc", limit_page_length=10)
+    messages = []
+    for row in rows:
+        prefix = "ptt-"
+        sender = row.file_name[len(prefix):].rsplit("-", 1)[0]
+        if sender == device_id:
+            continue
+        content = frappe.get_doc("File", row.name).get_content()
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        if len(content) < 100:
+            continue
+        messages.append({"cursor": str(row.creation), "sender": sender,
+                         "audio": base64.b64encode(content).decode("ascii")})
+    cursor = str(rows[-1].creation) if rows else after
+    return {"cursor": cursor, "messages": messages}
 
 
 def _number(value, label, required=False):
@@ -226,9 +288,17 @@ def _geocode_text(text):
     query = frappe.utils.strip_html(text or "").replace("\n", ", ").strip(" ,")
     if not query:
         return None
-    response = requests.get("https://nominatim.openstreetmap.org/search", params={"q": query, "format": "jsonv2", "limit": 1, "countrycodes": "ph"}, headers={"User-Agent": "Bluecore-ERPNext-Delivery-GPS/1.0"}, timeout=20)
-    response.raise_for_status()
-    rows = response.json()
+    try:
+        response = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": query, "format": "jsonv2", "limit": 1, "countrycodes": "ph"},
+            headers={"User-Agent": "Bluecore-ERPNext-Delivery-GPS/1.0"},
+            timeout=(3.05, 8),
+        )
+        response.raise_for_status()
+        rows = response.json()
+    except (requests.RequestException, ValueError):
+        rows = []
     if rows:
         return (float(rows[0]["lat"]), float(rows[0]["lon"]))
     upper = query.upper()
@@ -246,26 +316,52 @@ def _geocode_text(text):
 def populate_delivery_trip_coordinates(delivery_trip):
     _trip_permission(delivery_trip, "write")
     trip = frappe.get_doc("Delivery Trip", delivery_trip)
-    updated, unresolved = [], []
+    updated, unresolved, coordinates = [], [], {"warehouse": None, "stops": {}}
+    geocode_cache = {}
+    last_request_started = None
+
+    def geocode(text):
+        """Cache duplicates and space public Nominatim requests one second apart."""
+        nonlocal last_request_started
+        query = frappe.utils.strip_html(text or "").replace("\n", ", ").strip(" ,")
+        if not query:
+            return None
+        cache_key = " ".join(query.lower().split())
+        if cache_key in geocode_cache:
+            return geocode_cache[cache_key]
+        if last_request_started is not None:
+            time.sleep(max(0, 1.05 - (time.monotonic() - last_request_started)))
+        last_request_started = time.monotonic()
+        geocode_cache[cache_key] = _geocode_text(query)
+        return geocode_cache[cache_key]
+
+    address_names = [row.customer_address for row in trip.delivery_stops if row.customer_address]
+    address_displays = {
+        row.name: row.address_display for row in frappe.get_all(
+            "Address", filters={"name": ["in", address_names]},
+            fields=["name", "address_display"], limit_page_length=0,
+        )
+    } if address_names else {}
     warehouse = frappe.get_doc("Warehouse", trip.starting_warehouse) if trip.get("starting_warehouse") else None
     if not warehouse:
         unresolved.append(_("Starting Warehouse is not configured"))
     elif not warehouse.get("gps_latitude") or not warehouse.get("gps_longitude"):
         address = ", ".join(filter(None, [warehouse.address_line_1, warehouse.address_line_2, warehouse.city, warehouse.state, warehouse.pin, "Philippines"]))
-        point = _geocode_text(address)
+        point = geocode(address)
         if point:
             warehouse.db_set({"gps_latitude": point[0], "gps_longitude": point[1]}, update_modified=False); updated.append(warehouse.name)
+            coordinates["warehouse"] = {"latitude": point[0], "longitude": point[1]}
         else: unresolved.append(warehouse.name)
-        time.sleep(1.05)
     for stop in trip.delivery_stops:
         if stop.lat and stop.lng: continue
-        point = _geocode_text(stop.customer_address)
+        address = stop.address or address_displays.get(stop.customer_address) or stop.customer_address
+        point = geocode(address)
         if point:
             frappe.db.set_value("Delivery Stop", stop.name, {"lat": point[0], "lng": point[1]}, update_modified=False); updated.append(stop.delivery_note or stop.customer or stop.name)
+            coordinates["stops"][stop.name] = {"latitude": point[0], "longitude": point[1]}
         else: unresolved.append(stop.delivery_note or stop.customer or stop.name)
-        time.sleep(1.05)
     frappe.db.commit()
-    return {"updated": updated, "unresolved": unresolved}
+    return {"updated": updated, "unresolved": unresolved, "coordinates": coordinates}
 
 
 EVENT_RULES = {

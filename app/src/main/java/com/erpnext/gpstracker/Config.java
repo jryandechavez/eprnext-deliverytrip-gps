@@ -8,7 +8,7 @@ import androidx.security.crypto.MasterKey;
 final class Config {
     static final String PREFS = "gps_settings";
     static SharedPreferences prefs(Context c) { return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE); }
-    static String url(Context c) { return prefs(c).getString("url", "http://167.172.64.123/api/method/gps_tracker.api.location"); }
+    static String url(Context c) { return prefs(c).getString("url", "https://v15.tickandterry.com/api/method/gps_tracker.api.location"); }
     static String key(Context c) { return prefs(c).getString("api_key", ""); }
     static String secret(Context c) { return prefs(c).getString("api_secret", ""); }
     static SharedPreferences authPrefs(Context c) {
@@ -19,6 +19,8 @@ final class Config {
     }
     static String sessionId(Context c) { return authPrefs(c).getString("session_id", ""); }
     static String userEmail(Context c) { return authPrefs(c).getString("user_email", ""); }
+    static String userPassword(Context c) { return authPrefs(c).getString("user_password", ""); }
+    static long sessionRefreshedAt(Context c) { return authPrefs(c).getLong("session_refreshed_at", 0L); }
     static String deviceId(Context c) { return prefs(c).getString("device_id", android.os.Build.MODEL); }
     static long intervalMs(Context c) { return Math.max(1, prefs(c).getInt("interval", 5)) * 60_000L; }
     static boolean enabled(Context c) { return prefs(c).getBoolean("enabled", false); }
