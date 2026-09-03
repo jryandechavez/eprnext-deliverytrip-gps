@@ -19,6 +19,7 @@ import android.os.Bundle;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.view.View;
 import android.widget.*;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
@@ -44,6 +45,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     private boolean showAll=false;
     private CheckBox startOnBoot;
     private TextView status, setupStatus, loginStatus;
+    private Button startTripButton, endDeliveriesButton, startReturnButton, atWarehouseButton;
     private final BroadcastReceiver connectivityReceiver=new BroadcastReceiver(){@Override public void onReceive(Context context,Intent intent){updateConnectivityStatus();}};
 
     @Override public void onCreate(Bundle state) {
@@ -55,6 +57,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         deliveryList=findViewById(R.id.deliveryList); deliverySummary=findViewById(R.id.deliverySummary); showAllButton=findViewById(R.id.showAllDeliveries);connectivityStatus=findViewById(R.id.connectivityStatus);
         routeMapPreview=findViewById(R.id.routeMapPreview);routeMapPreview.getSettings().setJavaScriptEnabled(true);routeMapPreview.getSettings().setDomStorageEnabled(true);routeMapPreview.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
         startOnBoot=findViewById(R.id.startOnBoot); status=findViewById(R.id.status); setupStatus=findViewById(R.id.setupStatus);
+        startTripButton=findViewById(R.id.tripStarted);endDeliveriesButton=findViewById(R.id.tripCompleted);startReturnButton=findViewById(R.id.returnStarted);atWarehouseButton=findViewById(R.id.returnedWarehouse);
         showVersion();
         UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this);
         load();
@@ -69,10 +72,11 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         showAllButton.setOnCheckedChangeListener((button,checked)->{showAll=checked;renderDeliveries();});
         findViewById(R.id.signIn).setOnClickListener(v -> signIn());
         findViewById(R.id.signOut).setOnClickListener(v -> signOut());
-        findViewById(R.id.tripStarted).setOnClickListener(v -> confirmStart());
-        findViewById(R.id.tripCompleted).setOnClickListener(v -> confirmEnd());
-        findViewById(R.id.returnStarted).setOnClickListener(v -> {routePhase.setSelection(1);save();queueEvent("Return Started","",null);});
-        findViewById(R.id.returnedWarehouse).setOnClickListener(v -> queueEvent("Returned to Warehouse","",null));
+        startTripButton.setOnClickListener(v -> confirmStart());
+        endDeliveriesButton.setOnClickListener(v -> confirmEnd());
+        startReturnButton.setOnClickListener(v -> confirmReturn());
+        atWarehouseButton.setOnClickListener(v -> confirmWarehouse());
+        updateWorkflowButtons();
         if(Config.enabled(this)&&granted(Manifest.permission.ACCESS_FINE_LOCATION))startTrackingService();
     }
 
@@ -95,7 +99,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         Config.prefs(this).edit().putString("url",endpoint).putString("device_id",deviceId.getText().toString().trim())
             .putInt("interval",mins).putBoolean("boot",startOnBoot.isChecked()).apply();
         String trip=deliveryTrip.getText().toString().trim().replace("BLUECORE-TRIP:","");
-        String previous=Config.deliveryTrip(this);SharedPreferences.Editor tripEdit=Config.prefs(this).edit().putString("delivery_trip",trip).putString("route_phase",routePhase.getSelectedItem().toString());if(!trip.equals(previous))tripEdit.putBoolean("trip_started",false);tripEdit.apply();
+        String previous=Config.deliveryTrip(this);SharedPreferences.Editor tripEdit=Config.prefs(this).edit().putString("delivery_trip",trip).putString("route_phase",routePhase.getSelectedItem().toString());if(!trip.equals(previous))tripEdit.putBoolean("trip_started",false).putString("trip_workflow","not_started");tripEdit.apply();
         Config.prefs(this).edit().putString("driver_id",driverId.getText().toString().trim()).apply();
         return true;
     }
@@ -132,7 +136,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private void loadTrip(){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Enter or scan a Delivery Trip first");return;}
-        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<JSONObject> rows=new ArrayList<>();for(int i=0;i<stops.length();i++)rows.add(stops.getJSONObject(i));applyQueuedCompletions(rows);JSONObject warehouse=root.optJSONObject("warehouse");runOnUiThread(()->{deliveryRows.clear();deliveryRows.addAll(rows);if(warehouse!=null&&!warehouse.isNull("latitude")&&!warehouse.isNull("longitude"))Config.prefs(this).edit().putLong("warehouse_lat",Double.doubleToRawLongBits(warehouse.optDouble("latitude"))).putLong("warehouse_lng",Double.doubleToRawLongBits(warehouse.optDouble("longitude"))).apply();cacheTrip(root);renderDeliveries();renderInlineMap(root);toast(rows.size()+" deliveries loaded and available offline");});}catch(Exception e){runOnUiThread(()->{if(deliveryRows.isEmpty())restoreCachedTrip();toast(deliveryRows.isEmpty()?"Unable to load trip: "+e.getMessage():"Offline: showing saved trip information");});}}).start();
+        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<JSONObject> rows=new ArrayList<>();for(int i=0;i<stops.length();i++)rows.add(stops.getJSONObject(i));applyQueuedCompletions(rows);syncWorkflowFromServer(root.optJSONObject("trip"));JSONObject warehouse=root.optJSONObject("warehouse");runOnUiThread(()->{deliveryRows.clear();deliveryRows.addAll(rows);if(warehouse!=null&&!warehouse.isNull("latitude")&&!warehouse.isNull("longitude"))Config.prefs(this).edit().putLong("warehouse_lat",Double.doubleToRawLongBits(warehouse.optDouble("latitude"))).putLong("warehouse_lng",Double.doubleToRawLongBits(warehouse.optDouble("longitude"))).apply();cacheTrip(root);renderDeliveries();renderInlineMap(root);updateWorkflowButtons();toast(rows.size()+" deliveries loaded and available offline");});}catch(Exception e){runOnUiThread(()->{if(deliveryRows.isEmpty())restoreCachedTrip();toast(deliveryRows.isEmpty()?"Unable to load trip: "+e.getMessage():"Offline: showing saved trip information");});}}).start();
     }
     private void applyQueuedCompletions(ArrayList<JSONObject> rows){LocationQueue database=new LocationQueue(this);Set<String> pending;try{pending=database.pendingCompletedStops(Config.deliveryTrip(this));}finally{database.close();}for(JSONObject row:rows)if(pending.contains(row.optString("name")))try{row.put("delivery_status","Completed");}catch(Exception ignored){}}
     private void cacheTrip(JSONObject root){
@@ -163,8 +167,15 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private void renderDeliveries(){deliveryList.removeAllViews();int ongoing=0,completed=0;for(JSONObject row:deliveryRows){String state=row.optString("delivery_status","Pending");boolean done="Completed".equals(state)||"Skipped".equals(state);if(done)completed++;else ongoing++;if(!showAll&&done)continue;TextView card=new TextView(this);card.setText(row.optString("customer")+"\n"+row.optString("customer_address")+"\n"+row.optString("delivery_note")+"  •  "+state);card.setTextColor(getColor(R.color.bc_text));card.setTextSize(15);card.setPadding(18,16,18,16);card.setBackgroundResource(R.drawable.bg_status);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,0,0,10);card.setLayoutParams(lp);if(!done)card.setOnClickListener(v->confirmDelivery(row));deliveryList.addView(card);}deliverySummary.setText(ongoing+" ongoing · "+completed+" completed");}
     private void confirmDelivery(JSONObject row){new AlertDialog.Builder(this).setTitle("Complete Delivery?").setMessage(row.optString("customer")+"\n"+row.optString("customer_address")+"\nDelivery Note: "+row.optString("delivery_note")+"\n\nConfirm the items were delivered successfully.").setNegativeButton("Cancel",null).setPositiveButton("Confirm Delivery",(d,w)->queueEvent("Delivery Completed",row.optString("name"),row)).show();}
-    private void confirmStart(){new AlertDialog.Builder(this).setTitle("Start Deliveries?").setMessage("Begin "+Config.deliveryTrip(this)+" with "+deliveryRows.size()+" delivery stops?").setNegativeButton("Cancel",null).setPositiveButton("Start",(d,w)->{Config.prefs(this).edit().putBoolean("trip_started",true).apply();start(false);queueEvent("Trip Started","",null);}).show();}
-    private void confirmEnd(){new AlertDialog.Builder(this).setTitle("End Deliveries?").setMessage("End the delivery portion of this trip? GPS tracking will continue for the return to warehouse.").setNegativeButton("Cancel",null).setPositiveButton("End Deliveries",(d,w)->{queueEvent("Trip Completed","",null);Config.prefs(this).edit().putString("route_phase","Return").apply();routePhase.setSelection(1);}).show();}
+    private void confirmStart(){new AlertDialog.Builder(this).setTitle("Start Deliveries?").setMessage("Begin "+Config.deliveryTrip(this)+" with "+deliveryRows.size()+" delivery stops?").setNegativeButton("Cancel",null).setPositiveButton("Start",(d,w)->{Config.prefs(this).edit().putBoolean("trip_started",true).apply();start(false);queueEvent("Trip Started","",null);setWorkflow("delivery");}).show();}
+    private void confirmEnd(){new AlertDialog.Builder(this).setTitle("End Deliveries?").setMessage("Confirm that the delivery portion is finished. Return tracking has not started yet.").setNegativeButton("Cancel",null).setPositiveButton("End Deliveries",(d,w)->{queueEvent("Trip Completed","",null);setWorkflow("deliveries_ended");}).show();}
+    private void confirmReturn(){new AlertDialog.Builder(this).setTitle("Start Return?").setMessage("Begin tracking the return journey to the warehouse?").setNegativeButton("Cancel",null).setPositiveButton("Start Return",(d,w)->{routePhase.setSelection(1);save();queueEvent("Return Started","",null);setWorkflow("returning");}).show();}
+    private void confirmWarehouse(){new AlertDialog.Builder(this).setTitle("Arrived at Warehouse?").setMessage("Confirm that the vehicle has returned to the warehouse.").setNegativeButton("Cancel",null).setPositiveButton("At Warehouse",(d,w)->{queueEvent("Returned to Warehouse","",null);setWorkflow("returned");}).show();}
+    private String workflow(){return Config.prefs(this).getString("trip_workflow",Config.tripStarted(this)?"delivery":"not_started");}
+    private void setWorkflow(String value){Config.prefs(this).edit().putString("trip_workflow",value).apply();updateWorkflowButtons();}
+    private void updateWorkflowButtons(){if(startTripButton==null)return;String value=workflow();startTripButton.setVisibility("not_started".equals(value)?View.VISIBLE:View.GONE);endDeliveriesButton.setVisibility("delivery".equals(value)?View.VISIBLE:View.GONE);startReturnButton.setVisibility("deliveries_ended".equals(value)?View.VISIBLE:View.GONE);atWarehouseButton.setVisibility("returning".equals(value)?View.VISIBLE:View.GONE);}
+    private int workflowRank(String value){if("delivery".equals(value))return 1;if("deliveries_ended".equals(value))return 2;if("returning".equals(value))return 3;if("returned".equals(value))return 4;return 0;}
+    private void syncWorkflowFromServer(JSONObject trip){if(trip==null)return;String state=trip.optString("tracking_status",""),value=null;if("Delivery In Progress".equals(state))value="delivery";else if("Delivery Completed".equals(state))value="deliveries_ended";else if("Returning to Warehouse".equals(state))value="returning";else if("Returned to Warehouse".equals(state))value="returned";if(value!=null&&workflowRank(value)>workflowRank(workflow()))Config.prefs(this).edit().putString("trip_workflow",value).apply();}
     private void queueEvent(String type,String stop,JSONObject row){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Select a Delivery Trip first");return;}
         Location l=null;
