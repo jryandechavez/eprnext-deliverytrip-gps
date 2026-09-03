@@ -49,7 +49,7 @@ public class LocationService extends Service implements LocationListener {
         double lat=Config.warehouseLat(this),lng=Config.warehouseLng(this);if(Double.isNaN(lat)||Double.isNaN(lng))return;
         float[] result=new float[1];Location.distanceBetween(lat,lng,location.getLatitude(),location.getLongitude(),result);
         outsideWarehouseReadings=result[0]>=200?outsideWarehouseReadings+1:0;
-        if(outsideWarehouseReadings==3)update("Action required: vehicle is over 200 m from the warehouse. Open Bluecore GPS and start deliveries.");
+        if(outsideWarehouseReadings==3)update("Action required: vehicle is over 200 m from the warehouse. Open Tic & Terry Delivery and start deliveries.");
     }
     private void checkWarehouseReturn(Location location){
         if(!"returning".equals(Config.prefs(this).getString("trip_workflow",""))||location.getAccuracy()>75)return;
@@ -101,7 +101,7 @@ public class LocationService extends Service implements LocationListener {
     private Notification note(String s){
         Intent i=new Intent(this,MainActivity.class); PendingIntent p=PendingIntent.getActivity(this,0,i,PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
         Notification.Builder b=Build.VERSION.SDK_INT>=26 ? new Notification.Builder(this,CHANNEL) : new Notification.Builder(this);
-        return b.setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentTitle("Bluecore GPS").setContentText(s).setStyle(new Notification.BigTextStyle().bigText(s)).setContentIntent(p).setOngoing(true).build();
+        return b.setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentTitle("Tic & Terry Delivery").setContentText(s).setStyle(new Notification.BigTextStyle().bigText(s)).setContentIntent(p).setOngoing(true).build();
     }
     private void update(String s){Config.status(this,s);((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(NOTIFY,note(s));}
     @Override public void onDestroy(){retryHandler.removeCallbacks(retryTask);if(manager!=null)manager.removeUpdates(this);super.onDestroy();}
