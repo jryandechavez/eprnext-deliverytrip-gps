@@ -15,7 +15,7 @@ public class LocationService extends Service implements LocationListener {
     private static final String CHANNEL="gps_tracking"; private static final int NOTIFY=71;
     private LocationManager manager; private LocationQueue queue; private long lastRecorded=0; private boolean sending=false; private int outsideWarehouseReadings=0;
     private final Handler retryHandler=new Handler(Looper.getMainLooper());
-    private final Runnable retryTask=new Runnable(){@Override public void run(){drainQueue();retryHandler.postDelayed(this,60_000L);}};
+    private final Runnable retryTask=new Runnable(){@Override public void run(){checkMidnightStop();drainQueue();if(Config.enabled(LocationService.this))retryHandler.postDelayed(this,60_000L);}};
 
     @Override public void onCreate() { super.onCreate(); createChannel(); startForeground(NOTIFY,note("Waiting for location…")); manager=(LocationManager)getSystemService(LOCATION_SERVICE); queue=new LocationQueue(this); UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this); retryHandler.post(retryTask); }
     @Override public int onStartCommand(Intent intent,int flags,int id) {
@@ -41,6 +41,7 @@ public class LocationService extends Service implements LocationListener {
         queue.enqueue(payload,l.getTime());
         UploadScheduler.whenOnline(this);
         update("Location saved locally. "+queue.count()+" queued for upload.\n"+coords(l));
+        checkWarehouseReturn(l);
         drainQueue();
     }
     private void checkMissedStart(Location location){
@@ -50,6 +51,22 @@ public class LocationService extends Service implements LocationListener {
         outsideWarehouseReadings=result[0]>=200?outsideWarehouseReadings+1:0;
         if(outsideWarehouseReadings==3)update("Action required: vehicle is over 200 m from the warehouse. Open Bluecore GPS and start deliveries.");
     }
+    private void checkWarehouseReturn(Location location){
+        if(!"returning".equals(Config.prefs(this).getString("trip_workflow",""))||location.getAccuracy()>75)return;
+        double lat=Config.warehouseLat(this),lng=Config.warehouseLng(this);if(Double.isNaN(lat)||Double.isNaN(lng))return;
+        float[] result=new float[1];Location.distanceBetween(lat,lng,location.getLatitude(),location.getLongitude(),result);
+        if(result[0]<=150){queueReturnComplete(location);stopAutomaticTracking("Returned to warehouse (within 150 m). GPS tracking completed.","returned");}
+    }
+    private void checkMidnightStop(){
+        if(!"returning".equals(Config.prefs(this).getString("trip_workflow","")))return;
+        String started=Config.prefs(this).getString("return_tracking_date",""),today=new SimpleDateFormat("yyyy-MM-dd",Locale.US).format(new Date());
+        if(!started.isEmpty()&&!today.equals(started))stopAutomaticTracking("12:00 AM reached. GPS tracking completed.","tracking_ended");
+    }
+    private void queueReturnComplete(Location l){
+        String payload="{\"event_id\":"+q(UUID.randomUUID().toString())+",\"delivery_trip\":"+q(Config.deliveryTrip(this))+",\"delivery_stop\":\"\",\"driver\":"+q(Config.driverId(this))+",\"device_id\":"+q(Config.deviceId(this))+",\"event_type\":\"Returned to Warehouse\",\"latitude\":"+l.getLatitude()+",\"longitude\":"+l.getLongitude()+",\"accuracy\":"+l.getAccuracy()+",\"recorded_at\":"+q(iso(System.currentTimeMillis()))+"}";
+        queue.enqueue(payload,System.currentTimeMillis(),"gps_tracker.api.delivery_event");UploadScheduler.whenOnline(this);
+    }
+    private void stopAutomaticTracking(String message,String workflow){Config.prefs(this).edit().putBoolean("enabled",false).putString("trip_workflow",workflow).apply();update(message);stopForeground(true);stopSelf();}
     private synchronized void drainQueue() {
         if(sending||queue==null)return;
         LocationQueue.Item item=queue.oldest();
