@@ -14,6 +14,69 @@ from frappe import _
 PTT_MAX_BYTES = 300000
 
 
+def _mobile_company():
+    """Resolve the authenticated mobile user's company without trusting client input."""
+    driver = frappe.db.get_value("Driver", {"gps_user": frappe.session.user}, "name")
+    if driver:
+        trips = frappe.get_all(
+            "Delivery Trip",
+            filters={"driver": driver, "docstatus": ["<", 2]},
+            fields=["company"],
+            order_by="modified desc",
+            limit_page_length=1,
+        )
+        if trips and trips[0].company:
+            return trips[0].company
+
+    company = frappe.defaults.get_user_default("Company")
+    if not company:
+        permitted = frappe.get_all(
+            "User Permission",
+            filters={"user": frappe.session.user, "allow": "Company", "is_default": 1},
+            pluck="for_value",
+            limit_page_length=1,
+        )
+        company = permitted[0] if permitted else None
+    return company or frappe.defaults.get_global_default("company")
+
+
+@frappe.whitelist()
+def get_mobile_branding():
+    """Return company branding for the authenticated ERPNext mobile user."""
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Sign in is required"), frappe.PermissionError)
+
+    company = _mobile_company()
+    if not company or not frappe.db.exists("Company", company):
+        frappe.throw(_("No Company is configured for this user"))
+
+    branding = frappe.db.get_value(
+        "Company",
+        company,
+        ["company_name", "gps_mobile_app_logo", "company_logo", "modified"],
+        as_dict=True,
+    )
+    logo = branding.gps_mobile_app_logo or branding.company_logo or ""
+    if logo and not logo.startswith(("http://", "https://", "data:")):
+        logo = frappe.utils.get_url(logo)
+
+    return {
+        "company": company,
+        "company_name": branding.company_name or company,
+        "logo_url": logo,
+        "modified": branding.modified,
+    }
+
+
+@frappe.whitelist()
+def mobile_settings():
+    """Return centrally managed mobile policy without exposing other Stock Settings."""
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Sign in is required"), frappe.PermissionError)
+    interval = frappe.db.get_single_value("Stock Settings", "gps_tracking_interval_minutes") or 5
+    return {"gps_tracking_interval_minutes": max(1, frappe.utils.cint(interval))}
+
+
 @frappe.whitelist()
 def ptt_send(device_id=None, audio=None):
     """Store a short AMR push-to-talk transmission as a private File."""
@@ -179,12 +242,13 @@ def _mobile_driver(driver=None):
 
 
 @frappe.whitelist()
-def available_delivery_trips(device_id=None, driver=None, search=None):
+def available_delivery_trips(device_id=None, driver=None, search=None, include_completed=0, all_drivers=0):
     """Trips a driver can select or resolve after scanning a QR code."""
-    filters = {"docstatus": ["<", 2]}
+    statuses = ["Scheduled", "In Transit", "Completed"] if frappe.utils.cint(include_completed) else ["Scheduled", "In Transit"]
+    filters = {"docstatus": ["<", 2], "status": ["in", statuses]}
     if device_id:
         filters["gps_device_id"] = ["in", ["", device_id]]
-    driver = _mobile_driver(driver)
+    driver = None if frappe.utils.cint(all_drivers) else _mobile_driver(driver)
     if driver:
         filters["driver"] = driver
     or_filters = None
@@ -195,13 +259,34 @@ def available_delivery_trips(device_id=None, driver=None, search=None):
     return getter(
         "Delivery Trip", filters=filters, or_filters=or_filters,
         fields=["name", "company", "driver", "driver_name", "vehicle", "departure_time", "status", "gps_device_id", "gps_tracking_status"],
-        order_by="departure_time desc", limit_page_length=50,
+        order_by="departure_time desc", limit_page_length=0 if frappe.utils.cint(all_drivers) else 50,
     )
 
 
 @frappe.whitelist()
-def delivery_trip_route(delivery_trip, driver=None, device_id=None):
-    driver = _mobile_driver(driver)
+def transfer_delivery_trip(delivery_trip, device_id):
+    """Transfer an in-transit trip to another device owned by its assigned driver."""
+    delivery_trip = str(delivery_trip or "").strip()
+    device_id = str(device_id or "").strip()
+    if not delivery_trip or not device_id:
+        frappe.throw(_("Delivery Trip and Device ID are required"))
+    trip = frappe.get_doc("Delivery Trip", delivery_trip)
+    linked_driver = _mobile_driver()
+    if linked_driver:
+        if trip.driver != linked_driver:
+            frappe.throw(_("This Delivery Trip is assigned to another driver"), frappe.PermissionError)
+    else:
+        _trip_permission(delivery_trip, "write")
+    if trip.status != "In Transit":
+        frappe.throw(_("Only an In Transit Delivery Trip can be transferred"))
+    previous_device = trip.get("gps_device_id") or ""
+    trip.db_set("gps_device_id", device_id, update_modified=False)
+    return {"name": trip.name, "status": trip.status, "previous_device": previous_device, "device_id": device_id}
+
+
+@frappe.whitelist()
+def delivery_trip_route(delivery_trip, driver=None, device_id=None, all_drivers=0):
+    driver = None if frappe.utils.cint(all_drivers) else _mobile_driver(driver)
     if not driver:
         _trip_permission(delivery_trip)
     trip = frappe.get_doc("Delivery Trip", delivery_trip)
@@ -336,12 +421,16 @@ def populate_delivery_trip_coordinates(delivery_trip):
         return geocode_cache[cache_key]
 
     address_names = [row.customer_address for row in trip.delivery_stops if row.customer_address]
-    address_displays = {
-        row.name: row.address_display for row in frappe.get_all(
+    address_displays = {}
+    if address_names:
+        for row in frappe.get_all(
             "Address", filters={"name": ["in", address_names]},
-            fields=["name", "address_display"], limit_page_length=0,
-        )
-    } if address_names else {}
+            fields=["name", "address_line1", "address_line2", "city", "state", "pincode", "country"],
+            limit_page_length=0,
+        ):
+            address_displays[row.name] = ", ".join(filter(None, [
+                row.address_line1, row.address_line2, row.city, row.state, row.pincode, row.country,
+            ]))
     warehouse = frappe.get_doc("Warehouse", trip.starting_warehouse) if trip.get("starting_warehouse") else None
     if not warehouse:
         unresolved.append(_("Starting Warehouse is not configured"))
@@ -403,8 +492,14 @@ def delivery_event(**kwargs):
     else:
         _trip_permission(trip_name, "write")
     if trip.get("gps_device_id") and trip.gps_device_id != device_id:
-        frappe.throw(_("This Delivery Trip is assigned to another device"))
-    if not trip.get("gps_device_id"):
+        # A driver's replacement/current phone may legitimately start an assigned
+        # trip that was previously opened on another device. The authenticated
+        # driver check above is authoritative; transfer ownership on Trip Started.
+        if linked_driver and event_type == "Trip Started":
+            trip.db_set("gps_device_id", device_id, update_modified=False)
+        else:
+            frappe.throw(_("This Delivery Trip is assigned to another device"))
+    elif not trip.get("gps_device_id"):
         trip.db_set("gps_device_id", device_id, update_modified=False)
     latitude = _number(data.get("latitude"), _("Latitude"))
     longitude = _number(data.get("longitude"), _("Longitude"))
@@ -430,7 +525,12 @@ def delivery_event(**kwargs):
             frappe.db.set_value("Delivery Stop", stop.name, values, update_modified=False)
     if event_type in EVENT_RULES:
         status_field, status, time_field = EVENT_RULES[event_type]
-        frappe.db.set_value("Delivery Trip", trip.name, {status_field: status, time_field: timestamp}, update_modified=False)
+        trip_values = {status_field: status, time_field: timestamp}
+        if event_type == "Trip Started":
+            trip_values["status"] = "In Transit"
+        elif event_type == "Trip Completed":
+            trip_values["status"] = "Completed"
+        frappe.db.set_value("Delivery Trip", trip.name, trip_values, update_modified=False)
     doc = frappe.get_doc({
         "doctype": "GPS Delivery Event", "event_id": event_id or frappe.generate_hash(length=20),
         "delivery_trip": trip.name, "delivery_stop": stop.name if stop else None,
@@ -614,9 +714,11 @@ def location(**kwargs):
     delivery_trip = str(data.get("delivery_trip") or "").strip()
     linked_driver = _mobile_driver()
     if delivery_trip and linked_driver:
-        assigned_driver = frappe.db.get_value("Delivery Trip", delivery_trip, "driver")
+        assigned_driver, assigned_device = frappe.db.get_value("Delivery Trip", delivery_trip, ["driver", "gps_device_id"])
         if assigned_driver != linked_driver:
             frappe.throw(_("This Delivery Trip is assigned to another driver"), frappe.PermissionError)
+        if assigned_device and assigned_device != device_id:
+            frappe.throw(_("This Delivery Trip is assigned to another device"), frappe.PermissionError)
 
     report_id = str(data.get("report_id") or "").strip()
     if len(report_id) > 140:

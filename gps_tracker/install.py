@@ -3,6 +3,10 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 
 CUSTOM_FIELDS = {
+    "Stock Settings": [
+        {"fieldname": "gps_mobile_settings_section", "label": "GPS Mobile App", "fieldtype": "Section Break", "description": "Central settings applied to all signed-in Tic & Terry delivery devices."},
+        {"fieldname": "gps_tracking_interval_minutes", "label": "GPS Tracking Interval (Minutes)", "fieldtype": "Int", "default": "5", "reqd": 1, "insert_after": "gps_mobile_settings_section", "description": "How often mobile devices save and upload a GPS position. Minimum: 1 minute."},
+    ],
     "Delivery Trip": [
         {"fieldname": "gps_tracking_section", "label": "Bluecore GPS Tracking", "fieldtype": "Section Break", "insert_after": "status"},
         {"fieldname": "gps_device_id", "label": "GPS Device ID", "fieldtype": "Data", "insert_after": "gps_tracking_section", "in_list_view": 1},
@@ -54,6 +58,8 @@ CUSTOM_FIELDS = {
         {"fieldname": "gps_delivery_defaults_section", "label": "Delivery GPS Defaults", "fieldtype": "Section Break", "insert_after": "default_holiday_list"},
         {"fieldname": "gps_default_delivery_warehouse", "label": "Default Delivery Warehouse", "fieldtype": "Link", "options": "Warehouse", "insert_after": "gps_delivery_defaults_section", "description": "Default starting warehouse for Delivery Trips."},
         {"fieldname": "gps_delivery_warehouse_address", "label": "Warehouse Address", "fieldtype": "Small Text", "read_only": 1, "insert_after": "gps_default_delivery_warehouse"},
+        {"fieldname": "gps_mobile_branding_section", "label": "Mobile App Branding", "fieldtype": "Section Break", "insert_after": "gps_delivery_warehouse_address"},
+        {"fieldname": "gps_mobile_app_logo", "label": "Mobile App Logo", "fieldtype": "Attach Image", "insert_after": "gps_mobile_branding_section", "description": "Company logo displayed dynamically in the Tic & Terry mobile apps. The standard Company Logo is used when empty."},
     ],
     "GPS Location": [
         {"fieldname": "delivery_trip", "label": "Delivery Trip", "fieldtype": "Link", "options": "Delivery Trip", "insert_after": "device_id", "in_list_view": 1},
