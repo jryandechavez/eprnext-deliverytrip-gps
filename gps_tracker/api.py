@@ -340,9 +340,54 @@ def delivery_trip_route(delivery_trip, driver=None, device_id=None, all_drivers=
         "trip": {"name": trip.name, "company": trip.company, "driver": trip.driver, "driver_name": trip.driver_name,
                  "vehicle": trip.vehicle, "departure_time": trip.departure_time, "status": trip.status,
                  "device_id": trip.get("gps_device_id"), "tracking_status": trip.get("gps_tracking_status"),
-                 "starting_warehouse": trip.get("starting_warehouse")},
+                 "starting_warehouse": trip.get("starting_warehouse"),
+                 "route_order_manual": frappe.utils.cint(trip.get("gps_route_order_manual")),
+                 "route_order_remarks": trip.get("gps_route_order_remarks")},
         "warehouse": warehouse, "stops": stops, "locations": locations, "events": events,
     }
+
+
+@frappe.whitelist()
+def save_delivery_trip_stop_order(delivery_trip, ordered_stops, remarks):
+    """Persist a dispatcher-defined stop sequence and leave an audit comment."""
+    _trip_permission(delivery_trip, "write")
+    remarks = str(remarks or "").strip()
+    if not remarks:
+        frappe.throw(_("Remarks are required when manually rearranging a route"))
+    ordered_stops = frappe.parse_json(ordered_stops) if isinstance(ordered_stops, str) else ordered_stops
+    if not isinstance(ordered_stops, (list, tuple)):
+        frappe.throw(_("The stop order is invalid"))
+    ordered_stops = [str(name).strip() for name in ordered_stops if str(name).strip()]
+    trip = frappe.get_doc("Delivery Trip", delivery_trip)
+    previous = [row.name for row in sorted(trip.delivery_stops, key=lambda row: row.idx)]
+    expected = set(previous)
+    if len(ordered_stops) != len(previous) or set(ordered_stops) != expected:
+        frappe.throw(_("The stop order must include every Delivery Trip stop exactly once"))
+    labels = {row.name: row.delivery_note or row.customer or row.name for row in trip.delivery_stops}
+    for index, stop_name in enumerate(ordered_stops, 1):
+        frappe.db.set_value("Delivery Stop", stop_name, "idx", index, update_modified=False)
+    trip.db_set("gps_route_order_manual", 1, update_modified=False)
+    trip.db_set("gps_route_order_remarks", remarks, update_modified=False)
+    trip.add_comment("Info", _("Route manually rearranged by {0}.<br>Remarks: {1}<br>Previous: {2}<br>New: {3}").format(
+        frappe.session.user, frappe.utils.escape_html(remarks),
+        " → ".join(frappe.utils.escape_html(labels[name]) for name in previous),
+        " → ".join(frappe.utils.escape_html(labels[name]) for name in ordered_stops)))
+    return {"ordered_stops": ordered_stops, "remarks": remarks, "manual": 1}
+
+
+@frappe.whitelist()
+def use_optimized_delivery_trip_order(delivery_trip, remarks):
+    """Return route display to automatic delivery-window/location optimization."""
+    _trip_permission(delivery_trip, "write")
+    remarks = str(remarks or "").strip()
+    if not remarks:
+        frappe.throw(_("Remarks are required when changing the route order mode"))
+    trip = frappe.get_doc("Delivery Trip", delivery_trip)
+    trip.db_set("gps_route_order_manual", 0, update_modified=False)
+    trip.db_set("gps_route_order_remarks", remarks, update_modified=False)
+    trip.add_comment("Info", _("Route returned to optimized delivery-window/location order by {0}.<br>Remarks: {1}").format(
+        frappe.session.user, frappe.utils.escape_html(remarks)))
+    return {"manual": 0, "remarks": remarks}
 
 
 @frappe.whitelist()
