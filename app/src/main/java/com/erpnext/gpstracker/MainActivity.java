@@ -289,8 +289,8 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         try {
             android.content.pm.PackageInfo info=getPackageManager().getPackageInfo(getPackageName(),0);
             long build=Build.VERSION.SDK_INT>=28?info.getLongVersionCode():info.versionCode;
-            ((TextView)findViewById(R.id.versionInfo)).setText("Tic & Terry Delivery  v"+info.versionName+"  •  Build "+build);
-        } catch(Exception e) { ((TextView)findViewById(R.id.versionInfo)).setText("Tic & Terry Delivery"); }
+            ((TextView)findViewById(R.id.versionInfo)).setText("PL Aguila Delivery Trip  v"+info.versionName+"  •  Build "+build);
+        } catch(Exception e) { ((TextView)findViewById(R.id.versionInfo)).setText("PL Aguila Delivery Trip"); }
     }
     @Override public void onRequestPermissionsResult(int r,String[] p,int[] g) {
         super.onRequestPermissionsResult(r,p,g); refreshSetup();
