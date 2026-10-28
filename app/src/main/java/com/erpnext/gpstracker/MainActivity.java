@@ -19,6 +19,7 @@ import android.os.Bundle;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.text.InputType;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.view.View;
@@ -50,6 +51,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     private CheckBox startOnBoot;
     private TextView status, setupStatus, loginStatus;
     private Button startTripButton, endDeliveriesButton, startReturnButton, atWarehouseButton;
+    private boolean loginDialogVisible=false;
     private PttManager ptt;
     private final BroadcastReceiver connectivityReceiver=new BroadcastReceiver(){@Override public void onReceive(Context context,Intent intent){updateConnectivityStatus();}};
 
@@ -69,6 +71,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this);
         load();
         loadCompanyBranding();
+        if(Config.sessionId(this).isEmpty())findViewById(android.R.id.content).post(()->showLoginDialog("Sign in to access your delivery trips."));
         restoreCachedTrip();
         if(!Config.deliveryTrip(this).isEmpty()&&!Config.sessionId(this).isEmpty())loadTrip();
         findViewById(R.id.completeSetup).setOnClickListener(v -> completeSetup());
@@ -119,6 +122,23 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private String baseUrl(){String e=Config.url(this);int i=e.indexOf("/api/method/");return i>0?e.substring(0,i):e;}
     private void updateLoginStatus(){String email=Config.userEmail(this);loginStatus.setText(Config.sessionId(this).isEmpty()?"Not signed in":"Signed in as "+email);}
+    private static class AuthRequiredException extends IOException {AuthRequiredException(){super("ERPNext login required");}}
+    private HttpURLConnection authenticatedGet(String endpoint)throws IOException{
+        HttpURLConnection c=(HttpURLConnection)new URL(endpoint).openConnection();ErpAuth.apply(this,c);int code=c.getResponseCode();
+        if(code==401||code==403){c.disconnect();Config.authPrefs(this).edit().clear().apply();throw new AuthRequiredException();}
+        if(code<200||code>=300){c.disconnect();throw new IOException("ERPNext returned HTTP "+code);}
+        return c;
+    }
+    private boolean requireSession(){if(!Config.sessionId(this).isEmpty())return true;showLoginDialog("Your ERPNext session has ended. Sign in again to continue.");return false;}
+    private void showLoginDialog(String reason){
+        if(loginDialogVisible||isFinishing())return;loginDialogVisible=true;
+        LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);int pad=(int)(24*getResources().getDisplayMetrics().density);form.setPadding(pad,8,pad,0);
+        TextView message=new TextView(this);message.setText(reason);message.setTextSize(15);message.setPadding(0,0,0,12);form.addView(message);
+        EditText email=new EditText(this);email.setHint("Driver email");email.setSingleLine(true);email.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);email.setText(Config.userEmail(this));form.addView(email,new LinearLayout.LayoutParams(-1,-2));
+        EditText password=new EditText(this);password.setHint("ERPNext password");password.setSingleLine(true);password.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);form.addView(password,new LinearLayout.LayoutParams(-1,-2));
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("PL Aguila Login").setView(form).setNegativeButton("Cancel",null).setPositiveButton("Sign In",null).create();
+        dialog.setOnDismissListener(d->loginDialogVisible=false);dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String user=email.getText().toString().trim(),secret=password.getText().toString();if(user.isEmpty()||secret.isEmpty()){message.setText("Enter your ERPNext email and password.");return;}dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);message.setText("Signing in securely…");new Thread(()->{try{ErpAuth.refreshSession(this,user,secret);runOnUiThread(()->{loginEmail.setText(user);loginPassword.setText("");updateLoginStatus();dialog.dismiss();loadCompanyBranding();toast("Signed in. You can now search trips.");});}catch(Exception error){runOnUiThread(()->{message.setText("Sign-in failed. Check your email and password.");dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);});}}).start();}));dialog.show();
+    }
     private void signIn(){
         if(!save())return;String email=loginEmail.getText().toString().trim(),password=loginPassword.getText().toString();
         if(email.isEmpty()||password.isEmpty()){toast("Enter your ERPNext email and password");return;}
@@ -143,16 +163,16 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         super.onActivityResult(requestCode,resultCode,data);
     }
     private void searchTrips(){
-        if(!save())return; String query=deliveryTrip.getText().toString().trim().replace("BLUECORE-TRIP:","");
-        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.available_delivery_trips?device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&search="+URLEncoder.encode(query,"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONArray rows=new JSONObject(read(c.getInputStream())).getJSONArray("message");ArrayList<String> names=new ArrayList<>(),labels=new ArrayList<>();for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);String name=row.getString("name");names.add(name);labels.add(name+"\n"+row.optString("driver_name")+" · "+row.optString("status"));}runOnUiThread(()->showTripResults(names,labels));}catch(Exception e){runOnUiThread(()->toast("Unable to search trips: "+e.getMessage()));}}).start();
+        if(!save()||!requireSession())return; String query=deliveryTrip.getText().toString().trim().replace("BLUECORE-TRIP:","");
+        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.available_delivery_trips?device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&search="+URLEncoder.encode(query,"UTF-8");HttpURLConnection c=authenticatedGet(u);JSONArray rows=new JSONObject(read(c.getInputStream())).getJSONArray("message");ArrayList<String> names=new ArrayList<>(),labels=new ArrayList<>();for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);String name=row.getString("name");names.add(name);labels.add(name+"\n"+row.optString("driver_name")+" · "+row.optString("status"));}runOnUiThread(()->showTripResults(names,labels));}catch(AuthRequiredException e){runOnUiThread(()->{updateLoginStatus();showLoginDialog("Your ERPNext session has ended. Sign in again to search trips.");});}catch(Exception e){runOnUiThread(()->toast("Unable to search trips: "+e.getMessage()));}}).start();
     }
     private void showTripResults(ArrayList<String> names,ArrayList<String> labels){
         if(names.isEmpty()){toast("No available Delivery Trips found");return;}
         new AlertDialog.Builder(this).setTitle("Select Delivery Trip").setItems(labels.toArray(new String[0]),(dialog,which)->{deliveryTrip.setText(names.get(which));save();loadTrip();}).setNegativeButton("Cancel",null).show();
     }
     private void loadTrip(){
-        if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Enter or scan a Delivery Trip first");return;}
-        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();ErpAuth.apply(this,c);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<JSONObject> rows=new ArrayList<>();for(int i=0;i<stops.length();i++)rows.add(stops.getJSONObject(i));applyQueuedCompletions(rows);syncWorkflowFromServer(root.optJSONObject("trip"));JSONObject warehouse=root.optJSONObject("warehouse");runOnUiThread(()->{deliveryRows.clear();deliveryRows.addAll(rows);if(warehouse!=null&&!warehouse.isNull("latitude")&&!warehouse.isNull("longitude"))Config.prefs(this).edit().putLong("warehouse_lat",Double.doubleToRawLongBits(warehouse.optDouble("latitude"))).putLong("warehouse_lng",Double.doubleToRawLongBits(warehouse.optDouble("longitude"))).apply();cacheTrip(root);renderDeliveries();renderInlineMap(root);updateWorkflowButtons();toast(rows.size()+" deliveries loaded and available offline");});}catch(Exception e){runOnUiThread(()->{if(deliveryRows.isEmpty())restoreCachedTrip();toast(deliveryRows.isEmpty()?"Unable to load trip: "+e.getMessage():"Offline: showing saved trip information");});}}).start();
+        if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Enter or scan a Delivery Trip first");return;}if(!requireSession())return;
+        new Thread(()->{try{String u=baseUrl()+"/api/method/gps_tracker.api.delivery_trip_route?delivery_trip="+URLEncoder.encode(Config.deliveryTrip(this),"UTF-8")+"&driver="+URLEncoder.encode(Config.driverId(this),"UTF-8")+"&device_id="+URLEncoder.encode(Config.deviceId(this),"UTF-8");HttpURLConnection c=authenticatedGet(u);JSONObject root=new JSONObject(read(c.getInputStream())).getJSONObject("message");JSONArray stops=root.getJSONArray("stops");ArrayList<JSONObject> rows=new ArrayList<>();for(int i=0;i<stops.length();i++)rows.add(stops.getJSONObject(i));applyQueuedCompletions(rows);syncWorkflowFromServer(root.optJSONObject("trip"));JSONObject warehouse=root.optJSONObject("warehouse");runOnUiThread(()->{deliveryRows.clear();deliveryRows.addAll(rows);if(warehouse!=null&&!warehouse.isNull("latitude")&&!warehouse.isNull("longitude"))Config.prefs(this).edit().putLong("warehouse_lat",Double.doubleToRawLongBits(warehouse.optDouble("latitude"))).putLong("warehouse_lng",Double.doubleToRawLongBits(warehouse.optDouble("longitude"))).apply();cacheTrip(root);renderDeliveries();renderInlineMap(root);updateWorkflowButtons();toast(rows.size()+" deliveries loaded and available offline");});}catch(AuthRequiredException e){runOnUiThread(()->{updateLoginStatus();showLoginDialog("Your ERPNext session has ended. Sign in again to load this trip.");});}catch(Exception e){runOnUiThread(()->{if(deliveryRows.isEmpty())restoreCachedTrip();toast(deliveryRows.isEmpty()?"Unable to load trip: "+e.getMessage():"Offline: showing saved trip information");});}}).start();
     }
     private void applyQueuedCompletions(ArrayList<JSONObject> rows){LocationQueue database=new LocationQueue(this);Set<String> pending;try{pending=database.pendingCompletedStops(Config.deliveryTrip(this));}finally{database.close();}for(JSONObject row:rows)if(pending.contains(row.optString("name")))try{row.put("delivery_status","Completed");}catch(Exception ignored){}}
     private void cacheTrip(JSONObject root){
