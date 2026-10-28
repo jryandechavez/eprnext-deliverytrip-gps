@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "gps_tracker"
 version = "1.0.0"
 description = "Bluecore GPS receiver and location log for ERPNext"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 dependencies = []
 
 [tool.setuptools]
