@@ -151,8 +151,15 @@ def _number(value, label, required=False):
 
 def _request_data():
     data = dict(frappe.form_dict or {})
-    if getattr(frappe, "request", None) and frappe.request.is_json:
-        json_data = frappe.request.get_json(silent=True)
+    request = getattr(frappe, "request", None)
+    if request:
+        # Frappe v13's request wrapper does not expose ``is_json``. Calling
+        # get_json directly is supported by both the v13 Werkzeug request and
+        # newer Frappe releases, while ``silent`` keeps form requests intact.
+        try:
+            json_data = request.get_json(silent=True)
+        except (AttributeError, TypeError, ValueError):
+            json_data = None
         if isinstance(json_data, dict):
             data.update(json_data)
     data.pop("cmd", None)
