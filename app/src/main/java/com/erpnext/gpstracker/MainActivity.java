@@ -83,6 +83,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         showAllButton.setOnCheckedChangeListener((button,checked)->{showAll=checked;renderDeliveries();});
         findViewById(R.id.signIn).setOnClickListener(v -> signIn());
         findViewById(R.id.signOut).setOnClickListener(v -> signOut());
+        findViewById(R.id.logoutButton).setOnClickListener(v -> signOut());
         startTripButton.setOnClickListener(v -> confirmStart());
         endDeliveriesButton.setOnClickListener(v -> confirmEnd());
         updateWorkflowButtons();
@@ -156,7 +157,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
             Bitmap finalBitmap=bitmap;runOnUiThread(()->{companyName.setText(name.toUpperCase(Locale.US));if(finalBitmap!=null)companyLogo.setImageBitmap(finalBitmap);});
         }catch(Exception ignored){}}).start();
     }
-    private void signOut(){Config.authPrefs(this).edit().clear().apply();loginPassword.setText("");loginEmail.setText("");updateLoginStatus();toast("Signed out");}
+    private void signOut(){new AlertDialog.Builder(this).setTitle("Log Out?").setMessage("Sign out of PL Aguila Delivery Trip on this device?").setNegativeButton("Cancel",null).setPositiveButton("Log Out",(d,w)->{Config.authPrefs(this).edit().clear().apply();loginPassword.setText("");loginEmail.setText("");updateLoginStatus();toast("Signed out");showLoginDialog("You have signed out. Sign in to access delivery trips.");}).show();}
     private void scanTrip(){new IntentIntegrator(this).setPrompt("Scan the Delivery Trip QR code").setBeepEnabled(false).setOrientationLocked(false).initiateScan();}
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
         IntentResult result=IntentIntegrator.parseActivityResult(requestCode,resultCode,data);

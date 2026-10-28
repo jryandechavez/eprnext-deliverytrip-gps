@@ -371,13 +371,27 @@
                 android:visibility="gone" />
         </LinearLayout>
 
+        <Button
+            android:id="@+id/logoutButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginStart="18dp"
+            android:layout_marginTop="22dp"
+            android:layout_marginEnd="18dp"
+            android:background="@drawable/bg_button_danger"
+            android:fontFamily="sans-serif-medium"
+            android:text="Log Out"
+            android:textAllCaps="false"
+            android:textColor="@color/bc_danger"
+            android:textSize="15sp" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
             android:gravity="center"
             android:letterSpacing="0.04"
-            android:text="TIC &amp; TERRY  •  DELIVERY OPERATIONS"
+            android:text="PL AGUILA  •  DELIVERY OPERATIONS"
             android:textColor="@color/bc_muted"
             android:textSize="10sp" />
 
