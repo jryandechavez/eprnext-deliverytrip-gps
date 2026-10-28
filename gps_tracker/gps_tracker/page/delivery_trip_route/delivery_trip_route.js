@@ -34,7 +34,7 @@ class DeliveryTripRoute {
     async load() {
         const name=this.trip.get_value(); if(!name||!this.assets_ready||typeof L==="undefined") return;
         try { const r=await frappe.call({method:"gps_tracker.api.delivery_trip_route",args:{delivery_trip:name},freeze:true,freeze_message:__("Loading trip route…")}); this.data=r.message; await this.render(); }
-        catch(e){this.$map.html(`<div class="p-5 text-muted">${__("Unable to load this Delivery Trip.")}</div>`);}
+        catch(e){console.error("Delivery Trip Route load failed",e);this.$map.html(`<div class="p-5 text-muted">${__("Unable to load this Delivery Trip.")}</div>`);}
     }
     async render() {
         if(this.map)this.map.remove(); this.$map.empty();
