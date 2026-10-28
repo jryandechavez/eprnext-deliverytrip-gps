@@ -19,6 +19,8 @@ import android.os.Bundle;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.view.View;
 import android.widget.*;
 import android.webkit.WebView;
@@ -39,6 +41,8 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     private TextView deliverySummary;
     private CheckBox showAllButton;
     private TextView connectivityStatus;
+    private ImageView companyLogo;
+    private TextView companyName;
     private WebView routeMapPreview;
     private final ArrayList<JSONObject> deliveryRows=new ArrayList<>();
     private JSONObject cachedTripData;
@@ -56,6 +60,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         deliveryTrip=findViewById(R.id.deliveryTrip); routePhase=findViewById(R.id.routePhase);
         driverId=findViewById(R.id.driverId);
         deliveryList=findViewById(R.id.deliveryList); deliverySummary=findViewById(R.id.deliverySummary); showAllButton=findViewById(R.id.showAllDeliveries);connectivityStatus=findViewById(R.id.connectivityStatus);
+        companyLogo=findViewById(R.id.companyLogo);companyName=findViewById(R.id.companyName);
         routeMapPreview=findViewById(R.id.routeMapPreview);routeMapPreview.getSettings().setJavaScriptEnabled(true);routeMapPreview.getSettings().setDomStorageEnabled(true);routeMapPreview.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
         startOnBoot=findViewById(R.id.startOnBoot); status=findViewById(R.id.status); setupStatus=findViewById(R.id.setupStatus);
         startTripButton=findViewById(R.id.tripStarted);endDeliveriesButton=findViewById(R.id.tripCompleted);startReturnButton=findViewById(R.id.returnStarted);atWarehouseButton=findViewById(R.id.returnedWarehouse);
@@ -63,6 +68,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         showVersion();
         UploadScheduler.ensurePeriodic(this); UploadScheduler.whenOnline(this);
         load();
+        loadCompanyBranding();
         restoreCachedTrip();
         if(!Config.deliveryTrip(this).isEmpty()&&!Config.sessionId(this).isEmpty())loadTrip();
         findViewById(R.id.completeSetup).setOnClickListener(v -> completeSetup());
@@ -117,7 +123,17 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
         if(!save())return;String email=loginEmail.getText().toString().trim(),password=loginPassword.getText().toString();
         if(email.isEmpty()||password.isEmpty()){toast("Enter your ERPNext email and password");return;}
         findViewById(R.id.signIn).setEnabled(false);loginStatus.setText("Signing in securely…");
-        new Thread(()->{try{ErpAuth.refreshSession(this,email,password);Config.prefs(this).edit().remove("api_key").remove("api_secret").putBoolean("enabled",true).apply();runOnUiThread(()->{loginPassword.setText("");updateLoginStatus();if(granted(Manifest.permission.ACCESS_FINE_LOCATION))startTrackingService();else completeSetup();toast("Signed in. GPS tracking is automatic.");});}catch(Exception e){runOnUiThread(()->{loginPassword.setText("");loginStatus.setText("Sign-in failed");toast("Unable to sign in: check email, password, and server");});}finally{runOnUiThread(()->findViewById(R.id.signIn).setEnabled(true));}}).start();
+        new Thread(()->{try{ErpAuth.refreshSession(this,email,password);Config.prefs(this).edit().remove("api_key").remove("api_secret").putBoolean("enabled",true).apply();runOnUiThread(()->{loginPassword.setText("");updateLoginStatus();loadCompanyBranding();if(granted(Manifest.permission.ACCESS_FINE_LOCATION))startTrackingService();else completeSetup();toast("Signed in. GPS tracking is automatic.");});}catch(Exception e){runOnUiThread(()->{loginPassword.setText("");loginStatus.setText("Sign-in failed");toast("Unable to sign in: check email, password, and server");});}finally{runOnUiThread(()->findViewById(R.id.signIn).setEnabled(true));}}).start();
+    }
+    private void loadCompanyBranding(){
+        if(Config.sessionId(this).isEmpty())return;
+        new Thread(()->{try{
+            HttpURLConnection c=(HttpURLConnection)new URL(baseUrl()+"/api/method/gps_tracker.api.get_mobile_branding").openConnection();ErpAuth.apply(this,c);
+            JSONObject branding=new JSONObject(read(c.getInputStream())).getJSONObject("message");
+            String name=branding.optString("company_name","TIC & TERRY"),logo=branding.optString("logo_url","");Bitmap bitmap=null;
+            if(!logo.isEmpty()){HttpURLConnection image=(HttpURLConnection)new URL(logo.replace(" ","%20")).openConnection();image.setConnectTimeout(8000);image.setReadTimeout(12000);bitmap=BitmapFactory.decodeStream(image.getInputStream());}
+            Bitmap finalBitmap=bitmap;runOnUiThread(()->{companyName.setText(name.toUpperCase(Locale.US));if(finalBitmap!=null)companyLogo.setImageBitmap(finalBitmap);});
+        }catch(Exception ignored){}}).start();
     }
     private void signOut(){Config.authPrefs(this).edit().clear().apply();loginPassword.setText("");loginEmail.setText("");updateLoginStatus();toast("Signed out");}
     private void scanTrip(){new IntentIntegrator(this).setPrompt("Scan the Delivery Trip QR code").setBeepEnabled(false).setOrientationLocked(false).initiateScan();}

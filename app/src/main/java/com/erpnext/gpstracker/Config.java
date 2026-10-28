@@ -8,7 +8,7 @@ import androidx.security.crypto.MasterKey;
 final class Config {
     static final String PREFS = "gps_settings";
     static SharedPreferences prefs(Context c) { return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE); }
-    static String url(Context c) { return prefs(c).getString("url", "https://v15.tickandterry.com/api/method/gps_tracker.api.location"); }
+    static String url(Context c) { return prefs(c).getString("url", "https://soa.pl-aguila.com/api/method/gps_tracker.api.location"); }
     static String key(Context c) { return prefs(c).getString("api_key", ""); }
     static String secret(Context c) { return prefs(c).getString("api_secret", ""); }
     static SharedPreferences authPrefs(Context c) {

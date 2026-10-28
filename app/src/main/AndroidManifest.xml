@@ -18,7 +18,7 @@
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
-        android:label="Tic &amp; Terry Delivery"
+        android:label="PL Aguila Delivery Trip"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
         <activity android:name=".MainActivity" android:exported="true">

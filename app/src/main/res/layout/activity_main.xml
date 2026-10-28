@@ -17,10 +17,10 @@
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:padding="24dp">
-            <ImageView android:layout_width="72dp" android:layout_height="72dp" android:contentDescription="Tic and Terry logo" android:scaleType="fitCenter" android:src="@mipmap/ic_launcher" />
+            <ImageView android:id="@+id/companyLogo" android:layout_width="72dp" android:layout_height="72dp" android:contentDescription="Company logo" android:scaleType="fitCenter" android:src="@mipmap/ic_launcher" />
             <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="18dp" android:layout_weight="1" android:orientation="vertical">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="sans-serif-medium" android:letterSpacing="0.05" android:text="TIC &amp; TERRY" android:textColor="#8CC63F" android:textSize="12sp" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:fontFamily="sans-serif-medium" android:text="Delivery" android:textColor="@android:color/white" android:textSize="25sp" />
+                <TextView android:id="@+id/companyName" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="sans-serif-medium" android:letterSpacing="0.05" android:text="PL AGUILA" android:textColor="#8CC63F" android:textSize="12sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:fontFamily="sans-serif-medium" android:text="Delivery Trip" android:textColor="@android:color/white" android:textSize="25sp" />
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Secure corporate driver services" android:textColor="#B9C9E4" android:textSize="13sp" />
             </LinearLayout>
         </LinearLayout>
