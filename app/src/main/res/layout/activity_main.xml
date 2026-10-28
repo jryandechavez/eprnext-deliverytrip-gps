@@ -36,6 +36,7 @@
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PUSH TO TALK" android:textColor="@color/bc_blue" android:textStyle="bold" />
             <TextView android:id="@+id/pttStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Sign in to join the company-wide radio channel" android:textColor="@color/bc_muted" />
             <Button android:id="@+id/pttButton" android:layout_width="match_parent" android:layout_height="72dp" android:layout_marginTop="12dp" android:background="@drawable/bg_button_primary" android:text="Hold to Talk" android:textAllCaps="false" android:textColor="@android:color/white" android:textSize="20sp" android:textStyle="bold" />
+            <ProgressBar android:id="@+id/pttProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="4dp" android:layout_marginTop="6dp" android:max="600" android:progress="0" android:progressTint="@color/bc_blue" />
         </LinearLayout>
 
         <LinearLayout
@@ -114,7 +115,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif-medium"
                     android:letterSpacing="0.05"
-                    android:text="TIC &amp; TERRY"
+                    android:text="PL AGUILA"
                     android:textColor="@color/bc_cyan"
                     android:textSize="12sp" />
 

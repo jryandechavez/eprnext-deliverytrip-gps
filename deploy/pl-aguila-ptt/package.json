@@ -1,0 +1,9 @@
+{
+  "name": "pl-aguila-ptt-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PL Aguila memory-only WebSocket relay for live push-to-talk audio",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "ws": "8.21.3" }
+}
