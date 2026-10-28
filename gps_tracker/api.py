@@ -420,17 +420,29 @@ def populate_delivery_trip_coordinates(delivery_trip):
         geocode_cache[cache_key] = _geocode_text(query)
         return geocode_cache[cache_key]
 
-    address_names = [row.customer_address for row in trip.delivery_stops if row.customer_address]
-    address_displays = {}
+    address_names = []
+    stop_address_names = {}
+    for row in trip.delivery_stops:
+        # ERPNext versions differ here: in v13 `address` is the Address link and
+        # `customer_address` is its rendered text. Detect the Link instead of
+        # assuming one fixed field layout.
+        for candidate in (row.get("address"), row.get("customer_address")):
+            if candidate and frappe.db.exists("Address", candidate):
+                stop_address_names[row.name] = candidate
+                address_names.append(candidate)
+                break
+    address_displays, address_coordinates = {}, {}
     if address_names:
         for row in frappe.get_all(
-            "Address", filters={"name": ["in", address_names]},
-            fields=["name", "address_line1", "address_line2", "city", "state", "pincode", "country"],
+            "Address", filters={"name": ["in", list(set(address_names))]},
+            fields=["name", "address_line1", "address_line2", "city", "state", "pincode", "country", "gps_latitude", "gps_longitude"],
             limit_page_length=0,
         ):
             address_displays[row.name] = ", ".join(filter(None, [
                 row.address_line1, row.address_line2, row.city, row.state, row.pincode, row.country,
             ]))
+            if row.gps_latitude and row.gps_longitude:
+                address_coordinates[row.name] = (row.gps_latitude, row.gps_longitude)
     warehouse = frappe.get_doc("Warehouse", trip.starting_warehouse) if trip.get("starting_warehouse") else None
     if not warehouse:
         unresolved.append(_("Starting Warehouse is not configured"))
@@ -443,10 +455,23 @@ def populate_delivery_trip_coordinates(delivery_trip):
         else: unresolved.append(warehouse.name)
     for stop in trip.delivery_stops:
         if stop.lat and stop.lng: continue
-        address = stop.address or address_displays.get(stop.customer_address) or stop.customer_address
+        address_name = stop_address_names.get(stop.name)
+        point = address_coordinates.get(address_name)
+        if point:
+            frappe.db.set_value("Delivery Stop", stop.name, {"lat": point[0], "lng": point[1]}, update_modified=False)
+            updated.append(stop.delivery_note or stop.customer or stop.name)
+            coordinates["stops"][stop.name] = {"latitude": point[0], "longitude": point[1]}
+            continue
+        printable_values = [
+            value for value in (stop.get("customer_address"), stop.get("address"))
+            if value and not frappe.db.exists("Address", value)
+        ]
+        address = address_displays.get(address_name) or next(iter(printable_values), None) or address_name
         point = geocode(address)
         if point:
             frappe.db.set_value("Delivery Stop", stop.name, {"lat": point[0], "lng": point[1]}, update_modified=False); updated.append(stop.delivery_note or stop.customer or stop.name)
+            if address_name:
+                frappe.db.set_value("Address", address_name, {"gps_latitude": point[0], "gps_longitude": point[1]}, update_modified=False)
             coordinates["stops"][stop.name] = {"latitude": point[0], "longitude": point[1]}
         else: unresolved.append(stop.delivery_note or stop.customer or stop.name)
     frappe.db.commit()

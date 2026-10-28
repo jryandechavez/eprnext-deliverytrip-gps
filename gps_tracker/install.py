@@ -50,6 +50,9 @@ CUSTOM_FIELDS = {
         {"fieldname": "gps_delivery_window_section", "label": "Delivery Time Slot", "fieldtype": "Section Break", "insert_after": "is_your_company_address", "description": "Default receiving time window used when this address is added to a Delivery Trip."},
         {"fieldname": "gps_delivery_window_start", "label": "Delivery Window Start", "fieldtype": "Time", "insert_after": "gps_delivery_window_section"},
         {"fieldname": "gps_delivery_window_end", "label": "Delivery Window End", "fieldtype": "Time", "insert_after": "gps_delivery_window_start"},
+        {"fieldname": "gps_address_coordinates_section", "label": "Delivery Coordinates", "fieldtype": "Section Break", "insert_after": "gps_delivery_window_end", "description": "Reusable map coordinates for Delivery Notes and Delivery Trips using this address."},
+        {"fieldname": "gps_latitude", "label": "Latitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_address_coordinates_section"},
+        {"fieldname": "gps_longitude", "label": "Longitude", "fieldtype": "Float", "precision": "7", "insert_after": "gps_latitude"},
     ],
     "Driver": [
         {"fieldname": "gps_user", "label": "GPS Mobile User", "fieldtype": "Link", "options": "User", "unique": 1, "insert_after": "employee", "description": "ERPNext user account used by this driver in the Bluecore GPS app."},
