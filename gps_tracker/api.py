@@ -5,6 +5,7 @@ import json
 import secrets
 import time
 import requests
+import pytz
 from datetime import timedelta
 
 import frappe
@@ -175,7 +176,9 @@ def _recorded_at(value):
     except (TypeError, ValueError):
         frappe.throw(_("Recorded At is not a valid date and time"))
     if timestamp.tzinfo is not None:
-        timestamp = frappe.utils.convert_utc_to_system_timezone(timestamp).replace(tzinfo=None)
+        # Frappe v13 does not provide convert_utc_to_system_timezone.
+        system_zone = pytz.timezone(frappe.utils.get_time_zone())
+        timestamp = timestamp.astimezone(system_zone).replace(tzinfo=None)
     return timestamp
 
 
