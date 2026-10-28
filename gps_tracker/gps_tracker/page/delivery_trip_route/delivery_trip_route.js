@@ -12,6 +12,7 @@ class DeliveryTripRoute {
     constructor(wrapper) {
         this.page = frappe.ui.make_app_page({parent: wrapper, title: __("Delivery Trip Route"), single_column: true});
         this.trip = this.page.add_field({fieldname:"delivery_trip",label:__("Delivery Trip"),fieldtype:"Link",options:"Delivery Trip",reqd:1,change:()=>this.load()});
+        this.show_actual = this.page.add_field({fieldname:"show_actual_route",label:__("Show actual GPS route"),fieldtype:"Check",default:0,change:()=>{if(this.data)this.render();}});
         this.page.set_primary_action(__("Refresh"),()=>this.load(),"refresh");
         this.page.add_inner_button(__("Populate Coordinates"),()=>this.populate_coordinates(),__("Route Tools"));
         this.page.add_inner_button(__("Planned Route History"),()=>this.open_history("GPS Route Plan"),__("Route History"));
@@ -39,7 +40,7 @@ class DeliveryTripRoute {
     async render() {
         if(this.map)this.map.remove(); this.$map.empty();
         const d=this.data, valid=p=>p&&Number.isFinite(Number(p.latitude))&&Number.isFinite(Number(p.longitude))&&(Math.abs(Number(p.latitude))>0.0001||Math.abs(Number(p.longitude))>0.0001);
-        const planned=this.prioritize_points([d.warehouse,...d.stops].filter(valid)), delivery=d.locations.filter(p=>p.route_phase!=="Return"&&valid(p)), returned=d.locations.filter(p=>p.route_phase==="Return"&&valid(p));
+        const showActual=Boolean(Number(this.show_actual.get_value())), planned=this.prioritize_points([d.warehouse,...d.stops].filter(valid)), delivery=d.locations.filter(p=>p.route_phase!=="Return"&&valid(p)), returned=d.locations.filter(p=>p.route_phase==="Return"&&valid(p));
         const missing=(d.warehouse&&!valid(d.warehouse)?1:0)+d.stops.filter(s=>!valid(s)).length;
         if(missing)frappe.show_alert({message:__("{0} route locations need coordinates. Use Route Tools → Populate Coordinates.",[missing]),indicator:"orange"},8);
         // Leaflet bundled with Frappe v13 requires a view before layers are added.
@@ -47,18 +48,20 @@ class DeliveryTripRoute {
         this.map=L.map(this.$map[0]).setView([12.8797,121.7740],6); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap contributors"}).addTo(this.map);
         if(d.warehouse&&valid(d.warehouse))this.marker(d.warehouse,"W","bc-warehouse",__("Starting Warehouse: {0}",[d.warehouse.warehouse_name||d.warehouse.name]));
         d.stops.filter(valid).forEach((s,i)=>this.marker(s,String(i+1),"bc-stop-marker",`${s.customer||""}<br>${s.delivery_note||""}`));
-        d.events.filter(valid).forEach(e=>this.marker(e,"✓","bc-event-marker",`${e.event_type}<br>${e.delivery_note||""}<br>${frappe.datetime.str_to_user(e.recorded_at)}`));
+        if(showActual)d.events.filter(valid).forEach(e=>this.marker(e,"✓","bc-event-marker",`${e.event_type}<br>${e.delivery_note||""}<br>${frappe.datetime.str_to_user(e.recorded_at)}`));
         const plannedLine=await this.planned_route(planned);
         if(plannedLine.length>1){
             try{await frappe.call({method:"gps_tracker.api.save_planned_route",args:{delivery_trip:d.trip.name,waypoints:planned.map(p=>({latitude:p.latitude,longitude:p.longitude,delivery_note:p.delivery_note||""})),geometry:plannedLine}})}
             catch(e){console.warn("Unable to save planned route history",e)}
         }
         if(plannedLine.length)L.polyline(plannedLine,{color:"#2563eb",weight:5,opacity:.7,dashArray:"8 8"}).addTo(this.map);
-        if(delivery.length)L.polyline(delivery.map(p=>[p.latitude,p.longitude]),{color:"#16a34a",weight:5}).addTo(this.map);
-        if(returned.length)L.polyline(returned.map(p=>[p.latitude,p.longitude]),{color:"#7c3aed",weight:5}).addTo(this.map);
-        const all=[...plannedLine,...delivery.map(p=>[p.latitude,p.longitude]),...returned.map(p=>[p.latitude,p.longitude])]; if(all.length)this.map.fitBounds(L.latLngBounds(all).pad(.1));
+        if(showActual&&delivery.length)L.polyline(delivery.map(p=>[p.latitude,p.longitude]),{color:"#16a34a",weight:5}).addTo(this.map);
+        if(showActual&&returned.length)L.polyline(returned.map(p=>[p.latitude,p.longitude]),{color:"#7c3aed",weight:5}).addTo(this.map);
+        if(showActual&&d.locations.length){const latest=[...d.locations].reverse().find(valid);if(latest)this.marker(latest,"●","bc-event-marker",`${__("Current device position")}<br>${frappe.datetime.str_to_user(latest.recorded_at)}`);}
+        const actual=showActual?[...delivery.map(p=>[p.latitude,p.longitude]),...returned.map(p=>[p.latitude,p.longitude])]:[],all=[...plannedLine,...actual]; if(all.length)this.map.fitBounds(L.latLngBounds(all).pad(.1));
         this.$root.find(".bc-trip-summary").html(this.cards([[__("Status"),d.trip.tracking_status||d.trip.status],[__("Driver"),d.trip.driver_name||"—"],[__("Device"),d.trip.device_id||"—"],[__("Stops"),d.stops.length],[__("GPS Points"),d.locations.length]]));
-        this.$stops.html(`<div class="bc-stop"><b>${__("Stops and Delivery Notes")}</b><div class="bc-stop-meta">${__("Blue dashed: planned · Green: actual delivery · Purple: return")}</div></div>`+d.stops.map((s,i)=>`<div class="bc-stop"><div class="bc-stop-title">${i+1}. ${frappe.utils.escape_html(s.customer||__("Customer"))}</div><div>${s.delivery_note?`<a href="/app/delivery-note/${encodeURIComponent(s.delivery_note)}">${frappe.utils.escape_html(s.delivery_note)}</a>`:"—"} <span class="bc-badge">${frappe.utils.escape_html(s.delivery_status)}</span></div><div class="bc-stop-meta">${frappe.utils.escape_html(s.customer_address||s.address||"")}</div><button class="btn btn-xs btn-default mt-2 bc-share" data-stop="${frappe.utils.escape_html(s.name)}">${__("Create Customer Tracking Link")}</button></div>`).join(""));
+        const legend=showActual?__("Blue dashed: planned · Green: actual delivery · Purple: return"):__("Blue dashed: planned route · Enable Show actual GPS route to view device history");
+        this.$stops.html(`<div class="bc-stop"><b>${__("Stops and Delivery Notes")}</b><div class="bc-stop-meta">${legend}</div></div>`+d.stops.map((s,i)=>`<div class="bc-stop"><div class="bc-stop-title">${i+1}. ${frappe.utils.escape_html(s.customer||__("Customer"))}</div><div>${s.delivery_note?`<a href="/app/delivery-note/${encodeURIComponent(s.delivery_note)}">${frappe.utils.escape_html(s.delivery_note)}</a>`:"—"} <span class="bc-badge">${frappe.utils.escape_html(s.delivery_status)}</span></div><div class="bc-stop-meta">${frappe.utils.escape_html(s.customer_address||s.address||"")}</div><button class="btn btn-xs btn-default mt-2 bc-share" data-stop="${frappe.utils.escape_html(s.name)}">${__("Create Customer Tracking Link")}</button></div>`).join(""));
         this.$stops.find(".bc-share").on("click",async e=>{const stop=$(e.currentTarget).data("stop");const r=await frappe.call("gps_tracker.api.issue_public_tracking_link",{delivery_trip:d.trip.name,delivery_stop:stop});frappe.msgprint({title:__("Customer Tracking Link"),message:`<input class="form-control" readonly value="${frappe.utils.escape_html(r.message)}" onclick="this.select()">`,indicator:"green"});});
         setTimeout(()=>this.map.invalidateSize(),0);
     }
