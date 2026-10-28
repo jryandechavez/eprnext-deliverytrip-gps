@@ -168,7 +168,13 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     }
     private void showTripResults(ArrayList<String> names,ArrayList<String> labels){
         if(names.isEmpty()){toast("No available Delivery Trips found");return;}
-        new AlertDialog.Builder(this).setTitle("Select Delivery Trip").setItems(labels.toArray(new String[0]),(dialog,which)->{deliveryTrip.setText(names.get(which));save();loadTrip();}).setNegativeButton("Cancel",null).show();
+        final int pad=(int)(18*getResources().getDisplayMetrics().density),lineHeight=Math.max(1,(int)getResources().getDisplayMetrics().density);
+        ArrayAdapter<String> adapter=new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels){@Override public View getView(int position,View convertView,android.view.ViewGroup parent){
+            LinearLayout row=new LinearLayout(MainActivity.this);row.setOrientation(LinearLayout.VERTICAL);row.setBackgroundColor(getColor(android.R.color.white));
+            TextView text=new TextView(MainActivity.this);text.setText(getItem(position));text.setTextColor(getColor(R.color.bc_text));text.setTextSize(16);text.setLineSpacing(0,1.15f);text.setPadding(pad,pad,pad,pad);row.addView(text,new LinearLayout.LayoutParams(-1,-2));
+            View divider=new View(MainActivity.this);divider.setBackgroundColor(0xffd8e1ee);row.addView(divider,new LinearLayout.LayoutParams(-1,lineHeight));return row;
+        }};
+        new AlertDialog.Builder(this).setTitle("Select Delivery Trip").setAdapter(adapter,(dialog,which)->{deliveryTrip.setText(names.get(which));save();loadTrip();}).setNegativeButton("Cancel",null).show();
     }
     private void loadTrip(){
         if(!save()||Config.deliveryTrip(this).isEmpty()){toast("Enter or scan a Delivery Trip first");return;}if(!requireSession())return;
